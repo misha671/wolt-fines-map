@@ -2,421 +2,198 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Карта штрафов Wolt</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wolt Штрафы - Карта</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #1a1a1a;
-            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
             overflow: hidden;
         }
-        
         #map {
             width: 100vw;
             height: 100vh;
         }
-        
         .info-panel {
             position: absolute;
             top: 10px;
-            left: 10px;
-            background: rgba(26, 26, 26, 0.95);
-            backdrop-filter: blur(10px);
+            right: 10px;
+            background: white;
             padding: 15px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             z-index: 1000;
-            border: 1px solid rgba(255, 107, 53, 0.3);
+            max-width: 250px;
         }
-        
-        .info-panel h3 {
-            margin: 0 0 10px 0;
-            font-size: 15px;
-            color: #FF6B35;
-            font-weight: 600;
+        .info-title {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #333;
         }
-        
-        .info-panel p {
+        .info-item {
+            font-size: 14px;
             margin: 5px 0;
-            font-size: 13px;
-            color: #999;
+            color: #666;
         }
-        
-        .info-panel strong {
-            color: #FF6B35;
-            font-size: 20px;
+        .status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
         }
-        
-        .refresh-btn {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%);
-            color: white;
-            border: none;
-            padding: 14px 28px;
-            border-radius: 25px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            z-index: 1000;
-            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
-            transition: all 0.2s;
+        .status.active {
+            background: #4CAF50;
+            animation: pulse 2s infinite;
         }
-        
-        .refresh-btn:active {
-            transform: translateX(-50%) scale(0.95);
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
-        
-        .loading {
+        .loader {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(26, 26, 26, 0.95);
-            padding: 20px 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            font-size: 18px;
+            color: #666;
             z-index: 2000;
-            font-size: 16px;
-            color: #FF6B35;
-            border: 1px solid rgba(255, 107, 53, 0.3);
-        }
-        
-        .hidden {
-            display: none;
-        }
-
-        .leaflet-popup-content-wrapper {
-            background: rgba(26, 26, 26, 0.95);
-            color: white;
-            border: 1px solid rgba(255, 107, 53, 0.3);
-        }
-        
-        .leaflet-popup-tip {
-            background: rgba(26, 26, 26, 0.95);
-        }
-        
-        .marker-popup strong {
-            color: #FF6B35;
-            font-size: 15px;
-            display: block;
-            margin-bottom: 5px;
-        }
-        
-        .marker-popup .time {
-            color: #999;
-            font-size: 12px;
-        }
-
-        .status-indicator {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(26, 26, 26, 0.95);
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 11px;
-            color: #4CAF50;
-            z-index: 1000;
-            border: 1px solid rgba(76, 175, 80, 0.3);
-        }
-        
-        .status-indicator.loading {
-            color: #FF6B35;
-            border-color: rgba(255, 107, 53, 0.3);
-        }
-        
-        .status-indicator.error {
-            color: #f44336;
-            border-color: rgba(244, 67, 54, 0.3);
         }
     </style>
 </head>
 <body>
-    <div id="loading" class="loading">⏳ Загрузка...</div>
+    <div id="loader" class="loader">Загрузка карты...</div>
     <div id="map"></div>
-    
     <div class="info-panel">
-        <h3>⚠️ Штрафы Wolt</h3>
-        <p>Точек: <strong id="location-count">0</strong></p>
-        <p style="font-size: 11px; margin-top: 8px;">За последние 4 часа</p>
-        <p id="last-update" style="font-size: 11px; color: #666;">--:--</p>
+        <div class="info-title">📍 Wolt Штрафы</div>
+        <div class="info-item">
+            <span class="status active"></span>
+            Точек: <span id="count">0</span>
+        </div>
+        <div class="info-item">
+            Обновлено: <span id="updated">-</span>
+        </div>
+        <div class="info-item" style="font-size: 12px; color: #999; margin-top: 10px;">
+            Автообновление: 15 сек
+        </div>
     </div>
-    
-    <div id="status" class="status-indicator">☁️ Cloud Storage</div>
-    
-    <button class="refresh-btn" onclick="loadLocations(true)">🔄 Обновить</button>
 
     <script>
         // Инициализация Telegram WebApp
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.ready();
-        tg.disableVerticalSwipes();
-        
-        console.log('Telegram WebApp инициализирован');
-        console.log('Platform:', tg.platform);
-        console.log('Version:', tg.version);
-        
-        // Инициализация карты
-        const map = L.map('map').setView([32.0853, 34.7818], 12);
-        
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // Настройки
+        const GITHUB_URL = 'https://raw.githubusercontent.com/misha671/wolt-fines-map/main/locations.json';
+        const UPDATE_INTERVAL = 15000; // 15 секунд
+        const HOURS_LIMIT = 4;
+
+        // Создаём карту с центром на Хельсинки
+        const map = L.map('map').setView([60.1699, 24.9384], 12);
+
+        // Добавляем тайлы карты
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap',
+            attribution: '© OpenStreetMap contributors',
             maxZoom: 19
         }).addTo(map);
-        
-        let markers = [];
-        
-        function setStatus(text, type = 'ok') {
-            const status = document.getElementById('status');
-            status.textContent = text;
-            status.className = 'status-indicator' + (type !== 'ok' ? ' ' + type : '');
-        }
-        
-        function formatRelativeTime(isoString) {
-            try {
-                const date = new Date(isoString);
-                const now = new Date();
-                const diffMs = now - date;
-                const diffMins = Math.floor(diffMs / 60000);
-                
-                if (diffMins < 1) return 'только что';
-                if (diffMins < 60) return `${diffMins} мин назад`;
-                
-                const diffHours = Math.floor(diffMins / 60);
-                const remainMins = diffMins % 60;
-                if (diffHours < 4) return `${diffHours}ч ${remainMins}м назад`;
-                
-                return date.toLocaleTimeString('ru-RU', { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                });
-            } catch (e) {
-                return 'неизвестно';
-            }
-        }
-        
-        async function loadFromCloudStorage() {
-            return new Promise((resolve, reject) => {
-                console.log('Запрос данных из Cloud Storage...');
-                
-                // Получаем данные напрямую из bot_data через специальный запрос
-                tg.CloudStorage.getKeys((error, keys) => {
-                    if (error) {
-                        console.error('Ошибка получения ключей:', error);
-                        reject(error);
-                        return;
-                    }
-                    
-                    console.log('Доступные ключи:', keys);
-                    
-                    // Пробуем получить данные по разным ключам
-                    const possibleKeys = ['locations', 'bot_data', 'wolt_locations'];
-                    let found = false;
-                    
-                    possibleKeys.forEach(key => {
-                        if (keys.includes(key) && !found) {
-                            found = true;
-                            tg.CloudStorage.getItem(key, (err, value) => {
-                                if (err) {
-                                    console.error(`Ошибка чтения ${key}:`, err);
-                                    reject(err);
-                                } else if (value) {
-                                    try {
-                                        console.log(`Данные найдены в ключе: ${key}`);
-                                        const data = JSON.parse(value);
-                                        resolve(data);
-                                    } catch (e) {
-                                        console.error('Ошибка парсинга:', e);
-                                        reject(e);
-                                    }
-                                } else {
-                                    reject(new Error('Данные пусты'));
-                                }
-                            });
-                        }
-                    });
-                    
-                    if (!found) {
-                        // Нет известных ключей, пробуем прочитать всё
-                        if (keys.length > 0) {
-                            tg.CloudStorage.getItem(keys[0], (err, value) => {
-                                if (!err && value) {
-                                    try {
-                                        const data = JSON.parse(value);
-                                        resolve(data);
-                                    } catch (e) {
-                                        reject(new Error('Нет данных'));
-                                    }
-                                } else {
-                                    reject(new Error('Нет данных'));
-                                }
-                            });
-                        } else {
-                            reject(new Error('Cloud Storage пуст'));
-                        }
-                    }
-                });
+
+        // Слой для маркеров
+        let markersLayer = L.layerGroup().addTo(map);
+
+        // Функция для фильтрации точек по времени
+        function filterByTime(locations) {
+            const now = new Date();
+            const cutoff = new Date(now - HOURS_LIMIT * 60 * 60 * 1000);
+
+            return locations.filter(loc => {
+                try {
+                    const locTime = new Date(loc.timestamp);
+                    return locTime > cutoff;
+                } catch {
+                    return false;
+                }
             });
         }
-        
-        async function loadLocations(manual = false) {
+
+        // Функция загрузки данных
+        async function loadLocations() {
             try {
-                if (manual) {
-                    setStatus('⏳ Загрузка...', 'loading');
+                const response = await fetch(GITHUB_URL + '?t=' + Date.now());
+                if (!response.ok) {
+                    throw new Error('Ошибка загрузки');
                 }
-                
-                console.log(`[${new Date().toLocaleTimeString()}] Загрузка...`);
-                
-                // Читаем напрямую с GitHub Raw (БЕЗ кеша)
-                const cacheBuster = Date.now() + Math.random();
-                const url = `https://raw.githubusercontent.com/misha671/wolt-fines-map/main/locations.json?t=${cacheBuster}`;
-                
-                const response = await fetch(url, {
-                    method: 'GET',
-                    cache: 'no-store',
-                    headers: {'Cache-Control': 'no-cache'}
-                });
-                
-                const data = await response.json();
-                console.log('Данные загружены:', data);
-                
-                let locations = data.locations || [];
-                console.log(`Найдено локаций: ${locations.length}`);
-                
-                if (locations.length === 0) {
-                    setStatus('📭 Нет данных');
-                    updateUI(0);
-                    document.getElementById('loading').classList.add('hidden');
-                    return;
-                }
-                
-                // Фильтруем за 4 часа
-                const now = new Date();
-                const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
-                
-                const recentLocations = locations.filter(loc => {
-                    try {
-                        return new Date(loc.timestamp) > fourHoursAgo;
-                    } catch (e) {
-                        return false;
-                    }
-                });
-                
-                console.log(`За 4 часа: ${recentLocations.length}`);
-                
-                // Удаляем старые маркеры
-                markers.forEach(marker => {
-                    try {
-                        map.removeLayer(marker);
-                    } catch (e) {}
-                });
-                markers = [];
-                
+
+                const locations = await response.json();
+                const filtered = filterByTime(locations);
+
+                // Очищаем старые маркеры
+                markersLayer.clearLayers();
+
                 // Добавляем новые маркеры
-                if (recentLocations.length > 0) {
-                    recentLocations.forEach((loc) => {
-                        try {
-                            const customIcon = L.divIcon({
-                                className: 'custom-marker-icon',
-                                html: `<div style="background: #FF6B35; width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"><span style="transform: rotate(45deg); font-size: 14px;">⚠️</span></div>`,
-                                iconSize: [30, 30],
-                                iconAnchor: [15, 30],
-                                popupAnchor: [0, -30]
-                            });
-                            
-                            const marker = L.marker([loc.latitude, loc.longitude], {
-                                icon: customIcon
-                            })
-                                .addTo(map)
-                                .bindPopup(`
-                                    <div class="marker-popup">
-                                        <strong>${loc.user || 'Пользователь'}</strong>
-                                        <div class="time">${formatRelativeTime(loc.timestamp)}</div>
-                                    </div>
-                                `);
-                            
-                            markers.push(marker);
-                        } catch (e) {
-                            console.error('Ошибка маркера:', e);
-                        }
+                filtered.forEach((loc, index) => {
+                    const marker = L.marker([loc.latitude, loc.longitude])
+                        .addTo(markersLayer);
+
+                    // Создаём popup с информацией
+                    const time = new Date(loc.timestamp);
+                    const timeStr = time.toLocaleString('ru-RU', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
                     });
-                    
-                    // Центрируем карту
-                    try {
-                        if (markers.length > 0) {
-                            const group = L.featureGroup(markers);
-                            map.fitBounds(group.getBounds().pad(0.1));
-                        }
-                    } catch (e) {
-                        console.error('Ошибка центрирования:', e);
+
+                    let popupContent = `<b>Штраф #${filtered.length - index}</b><br>`;
+                    popupContent += `⏰ ${timeStr}<br>`;
+                    popupContent += `📍 ${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`;
+
+                    if (loc.message_text && loc.message_text.trim()) {
+                        popupContent += `<br><br>${loc.message_text.substring(0, 200)}`;
                     }
+
+                    marker.bindPopup(popupContent);
+                });
+
+                // Обновляем статистику
+                document.getElementById('count').textContent = filtered.length;
+                const now = new Date();
+                document.getElementById('updated').textContent = now.toLocaleTimeString('ru-RU', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+
+                // Скрываем лоадер
+                document.getElementById('loader').style.display = 'none';
+
+                // Центрируем карту на точках
+                if (filtered.length > 0) {
+                    const bounds = L.latLngBounds(filtered.map(loc => [loc.latitude, loc.longitude]));
+                    map.fitBounds(bounds, { padding: [50, 50] });
                 }
-                
-                updateUI(recentLocations.length);
-                setStatus('✅ Загружено');
-                
-                if (manual && tg.HapticFeedback) {
-                    tg.HapticFeedback.impactOccurred('medium');
-                }
-                
+
             } catch (error) {
-                console.error('Ошибка загрузки:', error);
-                setStatus('❌ Ошибка', 'error');
-                updateUI(0);
-                
-                if (manual) {
-                    tg.showAlert('Ошибка загрузки данных. Попробуйте позже или отправьте новую геолокацию.');
-                }
-            } finally {
-                document.getElementById('loading').classList.add('hidden');
+                console.error('Ошибка загрузки данных:', error);
+                document.getElementById('loader').textContent = 'Ошибка загрузки';
             }
         }
-        
-        function updateUI(count) {
-            document.getElementById('location-count').textContent = count;
-            const time = new Date().toLocaleTimeString('ru-RU', {
-                hour: '2-digit', 
-                minute: '2-digit'
-            });
-            document.getElementById('last-update').textContent = time;
-        }
-        
-        // Первая загрузка - МГНОВЕННО
-        loadLocations(true);
-        
-        // Автообновление каждые 3 секунды (очень быстро!)
-        setInterval(() => {
-            loadLocations(false);
-        }, 3000);
-        
-        // При возвращении на страницу - МГНОВЕННО
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) {
-                console.log('Страница активна - мгновенное обновление');
-                loadLocations(false);
-            }
-        });
-        
-        // Обработка изменений размера окна - МГНОВЕННО
-        tg.onEvent('viewportChanged', () => {
-            map.invalidateSize();
-        });
-        
-        console.log('✅ Mini App инициализирован');
+
+        // Загрузка при старте
+        loadLocations();
+
+        // Автообновление каждые 15 секунд
+        setInterval(loadLocations, UPDATE_INTERVAL);
     </script>
 </body>
 </html>
