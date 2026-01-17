@@ -150,18 +150,6 @@
         
         let markers = [];
         
-        // Тестовые данные (пока бот не подключен к API)
-        const TEST_DATA = {
-            locations: [
-                {
-                    latitude: 32.0853,
-                    longitude: 34.7818,
-                    timestamp: new Date().toISOString(),
-                    user: 'Test User'
-                }
-            ]
-        };
-        
         function formatRelativeTime(isoString) {
             const date = new Date(isoString);
             const now = new Date();
@@ -182,9 +170,17 @@
         
         async function loadLocations() {
             try {
-                // В будущем здесь будет запрос к API бота
-                // Пока используем тестовые данные
-                const data = TEST_DATA;
+                // Загружаем данные из GitHub
+                const response = await fetch('https://raw.githubusercontent.com/misha671/wolt-fines-map/main/locations.json');
+                
+                if (!response.ok) {
+                    console.log('Файл locations.json ещё не создан');
+                    updateUI(0);
+                    document.getElementById('loading').classList.add('hidden');
+                    return;
+                }
+                
+                const data = await response.json();
                 
                 // Фильтруем за последние 4 часа
                 const now = new Date();
