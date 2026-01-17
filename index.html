@@ -170,17 +170,28 @@
         
         async function loadLocations() {
             try {
-                // Загружаем данные из GitHub
-                const response = await fetch('https://raw.githubusercontent.com/misha671/wolt-fines-map/main/locations.json');
+                console.log('Загружаем данные из GitHub...');
+                
+                // Загружаем данные из GitHub с добавлением timestamp для обхода кеша
+                const timestamp = new Date().getTime();
+                const response = await fetch(`https://raw.githubusercontent.com/misha671/wolt-fines-map/main/locations.json?t=${timestamp}`);
                 
                 if (!response.ok) {
-                    console.log('Файл locations.json ещё не создан');
+                    console.log('Файл locations.json ещё не создан или недоступен');
                     updateUI(0);
                     document.getElementById('loading').classList.add('hidden');
                     return;
                 }
                 
                 const data = await response.json();
+                console.log('Получены данные:', data);
+                
+                if (!data || !data.locations || data.locations.length === 0) {
+                    console.log('Нет локаций в данных');
+                    updateUI(0);
+                    document.getElementById('loading').classList.add('hidden');
+                    return;
+                }
                 
                 // Фильтруем за последние 4 часа
                 const now = new Date();
@@ -191,13 +202,17 @@
                     return locDate > fourHoursAgo;
                 });
                 
+                console.log(`Найдено точек за 4 часа: ${recentLocations.length}`);
+                
                 // Удаляем старые маркеры
                 markers.forEach(marker => map.removeLayer(marker));
                 markers = [];
                 
                 // Добавляем маркеры
                 if (recentLocations.length > 0) {
-                    recentLocations.forEach(loc => {
+                    recentLocations.forEach((loc, index) => {
+                        console.log(`Добавляем маркер ${index + 1}:`, loc.latitude, loc.longitude);
+                        
                         const customIcon = L.divIcon({
                             className: 'custom-marker-icon',
                             html: '<div style="background: #FF6B35; width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"><span style="transform: rotate(45deg); font-size: 14px;">⚠️</span></div>',
@@ -212,7 +227,7 @@
                             .addTo(map)
                             .bindPopup(`
                                 <div class="marker-popup">
-                                    <strong>${loc.user}</strong>
+                                    <strong>${loc.user || 'Пользователь'}</strong>
                                     <div class="time">${formatRelativeTime(loc.timestamp)}</div>
                                 </div>
                             `);
@@ -222,6 +237,8 @@
                     // Центрируем карту
                     const group = L.featureGroup(markers);
                     map.fitBounds(group.getBounds().pad(0.1));
+                    
+                    console.log('Все маркеры добавлены на карту');
                 }
                 
                 updateUI(recentLocations.length);
@@ -231,9 +248,10 @@
                 }
                 
             } catch (error) {
-                console.error('Ошибка:', error);
+                console.error('Ошибка загрузки:', error);
+                updateUI(0);
                 if (tg) {
-                    tg.showAlert('Ошибка загрузки данных');
+                    tg.showAlert('Ошибка загрузки данных: ' + error.message);
                 }
             } finally {
                 document.getElementById('loading').classList.add('hidden');
@@ -246,14 +264,18 @@
                 new Date().toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
         }
         
-        // Загрузка
+        // Загрузка при открытии
         setTimeout(loadLocations, 500);
         
         // Автообновление каждые 30 секунд
         setInterval(loadLocations, 30000);
         
+        // Обновление при возвращении на страницу
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) loadLocations();
+            if (!document.hidden) {
+                console.log('Страница снова видна, обновляем данные');
+                loadLocations();
+            }
         });
     </script>
 </body>
