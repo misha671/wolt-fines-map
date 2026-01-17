@@ -203,11 +203,12 @@
                     setStatus('Обновление...', true);
                 }
                 
-                // Используем GitHub Pages вместо raw (обходим CORS)
+                // Используем CORS proxy для обхода блокировки
                 const cacheBuster = new Date().getTime();
-                const url = `https://misha671.github.io/wolt-fines-map/locations.json?cb=${cacheBuster}`;
+                const githubUrl = `https://misha671.github.io/wolt-fines-map/locations.json?cb=${cacheBuster}`;
+                const url = `https://api.allorigins.win/raw?url=${encodeURIComponent(githubUrl)}`;
                 
-                console.log(`[${new Date().toLocaleTimeString()}] Загрузка: ${url}`);
+                console.log(`[${new Date().toLocaleTimeString()}] Загрузка через proxy...`);
                 
                 const response = await fetch(url, {
                     method: 'GET',
