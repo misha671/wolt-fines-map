@@ -281,46 +281,23 @@
                 
                 console.log(`[${new Date().toLocaleTimeString()}] Загрузка данных...`);
                 
-                // Используем несколько источников для минимизации задержки
-                const cacheBuster = Date.now() + Math.random();
+                // ПРЯМАЯ ССЫЛКА НА ФАЙЛ ИЗ TELEGRAM (МГНОВЕННОЕ ОБНОВЛЕНИЕ!)
+                // Получите ссылку командой /link у бота
+                const TELEGRAM_FILE_URL = 'PASTE_TELEGRAM_URL_HERE';
                 
-                // Пробуем jsDelivr CDN (обновляется быстрее)
-                const urls = [
-                    `https://cdn.jsdelivr.net/gh/misha671/wolt-fines-map@main/locations.json?${cacheBuster}`,
-                    `https://raw.githubusercontent.com/misha671/wolt-fines-map/main/locations.json?${cacheBuster}`,
-                    `https://misha671.github.io/wolt-fines-map/locations.json?${cacheBuster}`
-                ];
-                
-                let response = null;
-                let lastError = null;
-                
-                // Пробуем все URL параллельно - используем первый успешный
-                for (const url of urls) {
-                    try {
-                        console.log(`Попытка: ${url.split('?')[0].split('/').slice(-2).join('/')}`);
-                        response = await fetch(url, {
-                            method: 'GET',
-                            headers: {
-                                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                                'Pragma': 'no-cache',
-                                'Expires': '0'
-                            },
-                            cache: 'no-store'
-                        });
-                        
-                        if (response.ok) {
-                            console.log('✅ Успешно загружено');
-                            break;
-                        }
-                    } catch (e) {
-                        lastError = e;
-                        console.warn(`Ошибка: ${e.message}`);
-                    }
+                if (TELEGRAM_FILE_URL === 'PASTE_TELEGRAM_URL_HERE') {
+                    setStatus('⚠️ Настройка', 'error');
+                    updateUI(0);
+                    document.getElementById('loading').classList.add('hidden');
+                    tg.showAlert('Напишите боту /link и вставьте полученную ссылку в код!');
+                    return;
                 }
                 
-                if (!response || !response.ok) {
-                    throw new Error(lastError ? lastError.message : 'Все источники недоступны');
-                }
+                const cacheBuster = Date.now();
+                const response = await fetch(`${TELEGRAM_FILE_URL}?t=${cacheBuster}`, {
+                    method: 'GET',
+                    cache: 'no-store'
+                });
                 
                 const data = await response.json();
                 console.log('Данные загружены:', data);
