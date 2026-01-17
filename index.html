@@ -400,31 +400,26 @@
             document.getElementById('last-update').textContent = time;
         }
         
-        // Первая загрузка
-        setTimeout(() => {
-            console.log('Инициализация загрузки...');
-            loadLocations(true);
-        }, 1000);
+        // Первая загрузка - МГНОВЕННО
+        loadLocations(true);
         
-        // Автообновление каждые 15 секунд
+        // Автообновление каждые 5 секунд (было 15)
         setInterval(() => {
             console.log('Автообновление...');
             loadLocations(false);
-        }, 15000);
+        }, 5000);
         
-        // При возвращении на страницу
+        // При возвращении на страницу - МГНОВЕННО
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) {
-                console.log('Страница активна - обновление');
-                setTimeout(() => loadLocations(false), 500);
+                console.log('Страница активна - мгновенное обновление');
+                loadLocations(false);
             }
         });
         
-        // Обработка изменений размера окна
+        // Обработка изменений размера окна - МГНОВЕННО
         tg.onEvent('viewportChanged', () => {
-            setTimeout(() => {
-                map.invalidateSize();
-            }, 100);
+            map.invalidateSize();
         });
         
         console.log('✅ Mini App инициализирован');
