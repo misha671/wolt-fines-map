@@ -281,30 +281,16 @@
                 
                 console.log(`[${new Date().toLocaleTimeString()}] Загрузка данных...`);
                 
-                // ВРЕМЕННО: используем тестовые данные, пока не получим ссылку на файл
-                // После первого запуска бота с геолокацией, отправьте боту команду /link
-                // и замените URL ниже на полученную ссылку
+                // Загружаем файл с GitHub Pages
+                const FILE_URL = 'https://misha671.github.io/wolt-fines-map/locations.json';
+                const cacheBuster = Date.now();
                 
-                const FILE_URL = 'PASTE_YOUR_LINK_HERE'; // Замените на ссылку от бота!
-                
-                if (FILE_URL === 'PASTE_YOUR_LINK_HERE') {
-                    // Показываем инструкцию
-                    setStatus('⚠️ Настройка', 'error');
-                    updateUI(0);
-                    document.getElementById('loading').classList.add('hidden');
-                    
-                    tg.showAlert(
-                        'Чтобы карта заработала:\n\n' +
-                        '1. Отправьте геолокацию в топик "Штрафы"\n' +
-                        '2. Напишите боту команду /link\n' +
-                        '3. Скопируйте полученную ссылку\n' +
-                        '4. Замените FILE_URL в коде HTML'
-                    );
-                    return;
-                }
-                
-                // Загружаем файл из Telegram
-                const response = await fetch(FILE_URL);
+                const response = await fetch(`${FILE_URL}?t=${cacheBuster}`, {
+                    method: 'GET',
+                    headers: {
+                        'Cache-Control': 'no-cache'
+                    }
+                });
                 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
