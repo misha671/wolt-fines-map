@@ -203,11 +203,11 @@
                     setStatus('Обновление...', true);
                 }
                 
-                // Добавляем случайный параметр для обхода кеша
+                // Используем GitHub Pages вместо raw (обходим CORS)
                 const cacheBuster = new Date().getTime();
-                const url = `https://raw.githubusercontent.com/misha671/wolt-fines-map/main/locations.json?cb=${cacheBuster}`;
+                const url = `https://misha671.github.io/wolt-fines-map/locations.json?cb=${cacheBuster}`;
                 
-                console.log(`[${new Date().toLocaleTimeString()}] Загрузка данных...`);
+                console.log(`[${new Date().toLocaleTimeString()}] Загрузка: ${url}`);
                 
                 const response = await fetch(url, {
                     method: 'GET',
