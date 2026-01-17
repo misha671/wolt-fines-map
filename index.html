@@ -281,19 +281,45 @@
                 
                 console.log(`[${new Date().toLocaleTimeString()}] Загрузка данных...`);
                 
-                // Загружаем файл с GitHub Pages
-                const FILE_URL = 'https://misha671.github.io/wolt-fines-map/locations.json';
-                const cacheBuster = Date.now();
+                // Используем несколько источников для минимизации задержки
+                const cacheBuster = Date.now() + Math.random();
                 
-                const response = await fetch(`${FILE_URL}?t=${cacheBuster}`, {
-                    method: 'GET',
-                    headers: {
-                        'Cache-Control': 'no-cache'
+                // Пробуем jsDelivr CDN (обновляется быстрее)
+                const urls = [
+                    `https://cdn.jsdelivr.net/gh/misha671/wolt-fines-map@main/locations.json?${cacheBuster}`,
+                    `https://raw.githubusercontent.com/misha671/wolt-fines-map/main/locations.json?${cacheBuster}`,
+                    `https://misha671.github.io/wolt-fines-map/locations.json?${cacheBuster}`
+                ];
+                
+                let response = null;
+                let lastError = null;
+                
+                // Пробуем все URL параллельно - используем первый успешный
+                for (const url of urls) {
+                    try {
+                        console.log(`Попытка: ${url.split('?')[0].split('/').slice(-2).join('/')}`);
+                        response = await fetch(url, {
+                            method: 'GET',
+                            headers: {
+                                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                                'Pragma': 'no-cache',
+                                'Expires': '0'
+                            },
+                            cache: 'no-store'
+                        });
+                        
+                        if (response.ok) {
+                            console.log('✅ Успешно загружено');
+                            break;
+                        }
+                    } catch (e) {
+                        lastError = e;
+                        console.warn(`Ошибка: ${e.message}`);
                     }
-                });
+                }
                 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                if (!response || !response.ok) {
+                    throw new Error(lastError ? lastError.message : 'Все источники недоступны');
                 }
                 
                 const data = await response.json();
@@ -403,11 +429,10 @@
         // Первая загрузка - МГНОВЕННО
         loadLocations(true);
         
-        // Автообновление каждые 5 секунд (было 15)
+        // Автообновление каждые 3 секунды (очень быстро!)
         setInterval(() => {
-            console.log('Автообновление...');
             loadLocations(false);
-        }, 5000);
+        }, 3000);
         
         // При возвращении на страницу - МГНОВЕННО
         document.addEventListener('visibilitychange', () => {
