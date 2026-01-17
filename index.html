@@ -279,24 +279,41 @@
                     setStatus('⏳ Загрузка...', 'loading');
                 }
                 
-                console.log(`[${new Date().toLocaleTimeString()}] Начало загрузки`);
+                console.log(`[${new Date().toLocaleTimeString()}] Загрузка данных...`);
                 
-                // Получаем данные из Cloud Storage
-                const data = await loadFromCloudStorage();
+                // ВРЕМЕННО: используем тестовые данные, пока не получим ссылку на файл
+                // После первого запуска бота с геолокацией, отправьте боту команду /link
+                // и замените URL ниже на полученную ссылку
                 
-                console.log('Получены данные:', data);
+                const FILE_URL = 'PASTE_YOUR_LINK_HERE'; // Замените на ссылку от бота!
                 
-                // Данные могут быть в разных форматах
-                let locations = [];
-                
-                if (Array.isArray(data)) {
-                    locations = data;
-                } else if (data.locations && Array.isArray(data.locations)) {
-                    locations = data.locations;
-                } else if (data.bot_data && data.bot_data.locations) {
-                    locations = data.bot_data.locations;
+                if (FILE_URL === 'PASTE_YOUR_LINK_HERE') {
+                    // Показываем инструкцию
+                    setStatus('⚠️ Настройка', 'error');
+                    updateUI(0);
+                    document.getElementById('loading').classList.add('hidden');
+                    
+                    tg.showAlert(
+                        'Чтобы карта заработала:\n\n' +
+                        '1. Отправьте геолокацию в топик "Штрафы"\n' +
+                        '2. Напишите боту команду /link\n' +
+                        '3. Скопируйте полученную ссылку\n' +
+                        '4. Замените FILE_URL в коде HTML'
+                    );
+                    return;
                 }
                 
+                // Загружаем файл из Telegram
+                const response = await fetch(FILE_URL);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Данные загружены:', data);
+                
+                let locations = data.locations || [];
                 console.log(`Найдено локаций: ${locations.length}`);
                 
                 if (locations.length === 0) {
