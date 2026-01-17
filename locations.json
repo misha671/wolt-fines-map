@@ -1,40 +1,12 @@
 {
   "locations": [
     {
-      "latitude": 32.040737,
-      "longitude": 34.768296,
-      "timestamp": "2026-01-17T19:27:21.150965",
+      "latitude": 32.044628,
+      "longitude": 34.761724,
+      "timestamp": "2026-01-17T19:35:43.874975",
       "user": "миша",
-      "message_id": 13
-    },
-    {
-      "latitude": 32.040737,
-      "longitude": 34.768296,
-      "timestamp": "2026-01-17T19:30:50.314683",
-      "user": "миша",
-      "message_id": 14
-    },
-    {
-      "latitude": 32.039928,
-      "longitude": 34.768113,
-      "timestamp": "2026-01-17T19:30:57.078027",
-      "user": "миша",
-      "message_id": 15
-    },
-    {
-      "latitude": 32.040737,
-      "longitude": 34.768296,
-      "timestamp": "2026-01-17T19:32:12.123519",
-      "user": "миша",
-      "message_id": 16
-    },
-    {
-      "latitude": 32.045355,
-      "longitude": 34.765292,
-      "timestamp": "2026-01-17T19:32:19.643286",
-      "user": "миша",
-      "message_id": 17
+      "message_id": 19
     }
   ],
-  "updated_at": "2026-01-17T19:32:19.645286"
+  "updated_at": "2026-01-17T19:35:43.875983"
 }
