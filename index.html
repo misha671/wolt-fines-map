@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Карта штрафов Wolt</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            overflow: hidden;
+        }
+        
+        #map {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(26, 26, 26, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+            border: 1px solid rgba(255, 107, 53, 0.3);
+        }
+        
+        .info-panel h3 {
+            margin: 0 0 10px 0;
+            font-size: 15px;
+            color: #FF6B35;
+            font-weight: 600;
+        }
+        
+        .info-panel p {
+            margin: 5px 0;
+            font-size: 13px;
+            color: #999;
+        }
+        
+        .info-panel strong {
+            color: #FF6B35;
+            font-size: 20px;
+        }
+        
+        .refresh-btn {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 25px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
+            transition: all 0.2s;
+        }
+        
+        .refresh-btn:active {
+            transform: translateX(-50%) scale(0.95);
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(26, 26, 26, 0.95);
+            padding: 20px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            z-index: 2000;
+            font-size: 16px;
+            color: #FF6B35;
+            border: 1px solid rgba(255, 107, 53, 0.3);
+        }
+        
+        .hidden {
+            display: none;
+        }
+
+        .leaflet-popup-content-wrapper {
+            background: rgba(26, 26, 26, 0.95);
+            color: white;
+            border: 1px solid rgba(255, 107, 53, 0.3);
+        }
+        
+        .leaflet-popup-tip {
+            background: rgba(26, 26, 26, 0.95);
+        }
+        
+        .marker-popup strong {
+            color: #FF6B35;
+            font-size: 15px;
+        }
+        
+        .marker-popup .time {
+            color: #999;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading" class="loading">⏳ Загрузка карты...</div>
+    <div id="map"></div>
+    
+    <div class="info-panel">
+        <h3>⚠️ Штрафы Wolt</h3>
+        <p>Точек: <strong id="location-count">0</strong></p>
+        <p style="font-size: 11px; margin-top: 8px;">За последние 4 часа</p>
+        <p id="last-update" style="font-size: 11px; color: #666;">--:--</p>
+    </div>
+    
+    <button class="refresh-btn" onclick="loadLocations()">🔄 Обновить</button>
+
+    <script>
+        let tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.expand();
+            tg.ready();
+        }
+        
+        // Инициализация карты (Тель-Авив)
+        const map = L.map('map').setView([32.0853, 34.7818], 12);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap',
+            maxZoom: 19
+        }).addTo(map);
+        
+        let markers = [];
+        
+        // Тестовые данные (пока бот не подключен к API)
+        const TEST_DATA = {
+            locations: [
+                {
+                    latitude: 32.0853,
+                    longitude: 34.7818,
+                    timestamp: new Date().toISOString(),
+                    user: 'Test User'
+                }
+            ]
+        };
+        
+        function formatRelativeTime(isoString) {
+            const date = new Date(isoString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            
+            if (diffMins < 1) return 'только что';
+            if (diffMins < 60) return `${diffMins} мин назад`;
+            
+            const diffHours = Math.floor(diffMins / 60);
+            if (diffHours < 4) return `${diffHours} ч ${diffMins % 60} мин назад`;
+            
+            return date.toLocaleTimeString('ru-RU', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+        }
+        
+        async function loadLocations() {
+            try {
+                // В будущем здесь будет запрос к API бота
+                // Пока используем тестовые данные
+                const data = TEST_DATA;
+                
+                // Фильтруем за последние 4 часа
+                const now = new Date();
+                const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+                
+                const recentLocations = data.locations.filter(loc => {
+                    const locDate = new Date(loc.timestamp);
+                    return locDate > fourHoursAgo;
+                });
+                
+                // Удаляем старые маркеры
+                markers.forEach(marker => map.removeLayer(marker));
+                markers = [];
+                
+                // Добавляем маркеры
+                if (recentLocations.length > 0) {
+                    recentLocations.forEach(loc => {
+                        const customIcon = L.divIcon({
+                            className: 'custom-marker-icon',
+                            html: '<div style="background: #FF6B35; width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"><span style="transform: rotate(45deg); font-size: 14px;">⚠️</span></div>',
+                            iconSize: [30, 30],
+                            iconAnchor: [15, 30],
+                            popupAnchor: [0, -30]
+                        });
+                        
+                        const marker = L.marker([loc.latitude, loc.longitude], {
+                            icon: customIcon
+                        })
+                            .addTo(map)
+                            .bindPopup(`
+                                <div class="marker-popup">
+                                    <strong>${loc.user}</strong>
+                                    <div class="time">${formatRelativeTime(loc.timestamp)}</div>
+                                </div>
+                            `);
+                        markers.push(marker);
+                    });
+                    
+                    // Центрируем карту
+                    const group = L.featureGroup(markers);
+                    map.fitBounds(group.getBounds().pad(0.1));
+                }
+                
+                updateUI(recentLocations.length);
+                
+                if (tg?.HapticFeedback) {
+                    tg.HapticFeedback.impactOccurred('light');
+                }
+                
+            } catch (error) {
+                console.error('Ошибка:', error);
+                if (tg) {
+                    tg.showAlert('Ошибка загрузки данных');
+                }
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+        
+        function updateUI(count) {
+            document.getElementById('location-count').textContent = count;
+            document.getElementById('last-update').textContent = 
+                new Date().toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
+        }
+        
+        // Загрузка
+        setTimeout(loadLocations, 500);
+        
+        // Автообновление каждые 30 секунд
+        setInterval(loadLocations, 30000);
+        
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) loadLocations();
+        });
+    </script>
+</body>
+</html>
