@@ -128,32 +128,24 @@
             padding: 8px 12px;
             border-radius: 8px;
             font-size: 11px;
-            color: #666;
+            color: #4CAF50;
             z-index: 1000;
-            border: 1px solid rgba(255, 107, 53, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.3);
         }
         
         .status-indicator.loading {
             color: #FF6B35;
+            border-color: rgba(255, 107, 53, 0.3);
         }
-
-        .debug-info {
-            position: absolute;
-            bottom: 80px;
-            left: 10px;
-            background: rgba(26, 26, 26, 0.9);
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 10px;
-            color: #666;
-            z-index: 1000;
-            max-width: 300px;
-            word-wrap: break-word;
+        
+        .status-indicator.error {
+            color: #f44336;
+            border-color: rgba(244, 67, 54, 0.3);
         }
     </style>
 </head>
 <body>
-    <div id="loading" class="loading">⏳ Загрузка карты...</div>
+    <div id="loading" class="loading">⏳ Загрузка...</div>
     <div id="map"></div>
     
     <div class="info-panel">
@@ -163,24 +155,22 @@
         <p id="last-update" style="font-size: 11px; color: #666;">--:--</p>
     </div>
     
-    <div id="status" class="status-indicator">Загрузка...</div>
-    <div id="debug" class="debug-info hidden"></div>
+    <div id="status" class="status-indicator">☁️ Cloud Storage</div>
     
     <button class="refresh-btn" onclick="loadLocations(true)">🔄 Обновить</button>
 
     <script>
-        let tg = window.Telegram?.WebApp;
-        let useCloudStorage = false;
+        // Инициализация Telegram WebApp
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+        tg.disableVerticalSwipes();
         
-        if (tg) {
-            tg.expand();
-            tg.ready();
-            tg.disableVerticalSwipes();
-            useCloudStorage = !!tg.CloudStorage;
-            console.log('Telegram WebApp инициализирован');
-            console.log('CloudStorage доступен:', useCloudStorage);
-        }
+        console.log('Telegram WebApp инициализирован');
+        console.log('Platform:', tg.platform);
+        console.log('Version:', tg.version);
         
+        // Инициализация карты
         const map = L.map('map').setView([32.0853, 34.7818], 12);
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -189,93 +179,95 @@
         }).addTo(map);
         
         let markers = [];
-        let lastDataHash = '';
         
-        function debugLog(msg) {
-            console.log(msg);
-            const debug = document.getElementById('debug');
-            debug.innerHTML = msg + '<br>' + debug.innerHTML;
-            debug.classList.remove('hidden');
-        }
-        
-        function setStatus(text, isLoading = false) {
+        function setStatus(text, type = 'ok') {
             const status = document.getElementById('status');
             status.textContent = text;
-            status.className = 'status-indicator' + (isLoading ? ' loading' : '');
+            status.className = 'status-indicator' + (type !== 'ok' ? ' ' + type : '');
         }
         
         function formatRelativeTime(isoString) {
-            const date = new Date(isoString);
-            const now = new Date();
-            const diffMs = now - date;
-            const diffMins = Math.floor(diffMs / 60000);
-            
-            if (diffMins < 1) return 'только что';
-            if (diffMins < 60) return `${diffMins} мин назад`;
-            
-            const diffHours = Math.floor(diffMins / 60);
-            const remainMins = diffMins % 60;
-            if (diffHours < 4) return `${diffHours}ч ${remainMins}м назад`;
-            
-            return date.toLocaleTimeString('ru-RU', { 
-                hour: '2-digit', 
-                minute: '2-digit' 
-            });
-        }
-        
-        async function loadFromGitHub() {
-            const urls = [
-                'https://misha671.github.io/wolt-fines-map/locations.json',
-                'https://raw.githubusercontent.com/misha671/wolt-fines-map/main/locations.json',
-                'https://api.allorigins.win/raw?url=https://misha671.github.io/wolt-fines-map/locations.json'
-            ];
-            
-            for (let url of urls) {
-                try {
-                    debugLog(`Пробую: ${url.substring(0, 50)}...`);
-                    
-                    const response = await fetch(url + '?t=' + Date.now(), {
-                        method: 'GET',
-                        headers: {
-                            'Cache-Control': 'no-cache'
-                        }
-                    });
-                    
-                    if (response.ok) {
-                        const text = await response.text();
-                        debugLog(`✅ Успех! Размер: ${text.length} байт`);
-                        return JSON.parse(text);
-                    }
-                } catch (e) {
-                    debugLog(`❌ Ошибка: ${e.message}`);
-                }
+            try {
+                const date = new Date(isoString);
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMins = Math.floor(diffMs / 60000);
+                
+                if (diffMins < 1) return 'только что';
+                if (diffMins < 60) return `${diffMins} мин назад`;
+                
+                const diffHours = Math.floor(diffMins / 60);
+                const remainMins = diffMins % 60;
+                if (diffHours < 4) return `${diffHours}ч ${remainMins}м назад`;
+                
+                return date.toLocaleTimeString('ru-RU', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+            } catch (e) {
+                return 'неизвестно';
             }
-            
-            throw new Error('Все источники недоступны');
         }
         
         async function loadFromCloudStorage() {
-            return new Promise((resolve) => {
-                if (!tg.CloudStorage) {
-                    resolve(null);
-                    return;
-                }
+            return new Promise((resolve, reject) => {
+                console.log('Запрос данных из Cloud Storage...');
                 
-                tg.CloudStorage.getItem('wolt_locations', (error, value) => {
+                // Получаем данные напрямую из bot_data через специальный запрос
+                tg.CloudStorage.getKeys((error, keys) => {
                     if (error) {
-                        debugLog(`CloudStorage ошибка: ${error}`);
-                        resolve(null);
-                    } else if (value) {
-                        try {
-                            debugLog('✅ Данные из CloudStorage');
-                            resolve(JSON.parse(value));
-                        } catch (e) {
-                            debugLog(`Parse ошибка: ${e.message}`);
-                            resolve(null);
+                        console.error('Ошибка получения ключей:', error);
+                        reject(error);
+                        return;
+                    }
+                    
+                    console.log('Доступные ключи:', keys);
+                    
+                    // Пробуем получить данные по разным ключам
+                    const possibleKeys = ['locations', 'bot_data', 'wolt_locations'];
+                    let found = false;
+                    
+                    possibleKeys.forEach(key => {
+                        if (keys.includes(key) && !found) {
+                            found = true;
+                            tg.CloudStorage.getItem(key, (err, value) => {
+                                if (err) {
+                                    console.error(`Ошибка чтения ${key}:`, err);
+                                    reject(err);
+                                } else if (value) {
+                                    try {
+                                        console.log(`Данные найдены в ключе: ${key}`);
+                                        const data = JSON.parse(value);
+                                        resolve(data);
+                                    } catch (e) {
+                                        console.error('Ошибка парсинга:', e);
+                                        reject(e);
+                                    }
+                                } else {
+                                    reject(new Error('Данные пусты'));
+                                }
+                            });
                         }
-                    } else {
-                        debugLog('CloudStorage пуст');
-                        resolve(null);
+                    });
+                    
+                    if (!found) {
+                        // Нет известных ключей, пробуем прочитать всё
+                        if (keys.length > 0) {
+                            tg.CloudStorage.getItem(keys[0], (err, value) => {
+                                if (!err && value) {
+                                    try {
+                                        const data = JSON.parse(value);
+                                        resolve(data);
+                                    } catch (e) {
+                                        reject(new Error('Нет данных'));
+                                    }
+                                } else {
+                                    reject(new Error('Нет данных'));
+                                }
+                            });
+                        } else {
+                            reject(new Error('Cloud Storage пуст'));
+                        }
                     }
                 });
             });
@@ -284,38 +276,41 @@
         async function loadLocations(manual = false) {
             try {
                 if (manual) {
-                    setStatus('Обновление...', true);
+                    setStatus('⏳ Загрузка...', 'loading');
                 }
                 
-                debugLog(`[${new Date().toLocaleTimeString()}] Загрузка данных...`);
+                console.log(`[${new Date().toLocaleTimeString()}] Начало загрузки`);
                 
-                // Сначала пробуем CloudStorage, потом GitHub
-                let data = null;
+                // Получаем данные из Cloud Storage
+                const data = await loadFromCloudStorage();
                 
-                if (useCloudStorage) {
-                    data = await loadFromCloudStorage();
+                console.log('Получены данные:', data);
+                
+                // Данные могут быть в разных форматах
+                let locations = [];
+                
+                if (Array.isArray(data)) {
+                    locations = data;
+                } else if (data.locations && Array.isArray(data.locations)) {
+                    locations = data.locations;
+                } else if (data.bot_data && data.bot_data.locations) {
+                    locations = data.bot_data.locations;
                 }
                 
-                if (!data) {
-                    debugLog('Пробую GitHub...');
-                    data = await loadFromGitHub();
-                }
+                console.log(`Найдено локаций: ${locations.length}`);
                 
-                if (!data || !data.locations) {
-                    debugLog('Нет данных');
-                    setStatus('Нет данных');
+                if (locations.length === 0) {
+                    setStatus('📭 Нет данных');
                     updateUI(0);
                     document.getElementById('loading').classList.add('hidden');
                     return;
                 }
                 
-                debugLog(`Найдено точек: ${data.locations.length}`);
-                
                 // Фильтруем за 4 часа
                 const now = new Date();
                 const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
                 
-                const recentLocations = data.locations.filter(loc => {
+                const recentLocations = locations.filter(loc => {
                     try {
                         return new Date(loc.timestamp) > fourHoursAgo;
                     } catch (e) {
@@ -323,7 +318,7 @@
                     }
                 });
                 
-                debugLog(`За 4 часа: ${recentLocations.length}`);
+                console.log(`За 4 часа: ${recentLocations.length}`);
                 
                 // Удаляем старые маркеры
                 markers.forEach(marker => {
@@ -333,7 +328,7 @@
                 });
                 markers = [];
                 
-                // Добавляем новые
+                // Добавляем новые маркеры
                 if (recentLocations.length > 0) {
                     recentLocations.forEach((loc) => {
                         try {
@@ -362,35 +357,31 @@
                         }
                     });
                     
-                    // Центрируем
+                    // Центрируем карту
                     try {
                         if (markers.length > 0) {
                             const group = L.featureGroup(markers);
                             map.fitBounds(group.getBounds().pad(0.1));
                         }
-                    } catch (e) {}
+                    } catch (e) {
+                        console.error('Ошибка центрирования:', e);
+                    }
                 }
                 
                 updateUI(recentLocations.length);
                 setStatus('✅ Загружено');
                 
-                if (manual && tg?.HapticFeedback) {
+                if (manual && tg.HapticFeedback) {
                     tg.HapticFeedback.impactOccurred('medium');
                 }
                 
-                // Скрываем debug через 5 секунд
-                setTimeout(() => {
-                    document.getElementById('debug').classList.add('hidden');
-                }, 5000);
-                
             } catch (error) {
-                console.error('Ошибка:', error);
-                debugLog(`❌ ОШИБКА: ${error.message}`);
-                setStatus('Ошибка');
+                console.error('Ошибка загрузки:', error);
+                setStatus('❌ Ошибка', 'error');
                 updateUI(0);
                 
-                if (manual && tg) {
-                    tg.showAlert('Ошибка: ' + error.message);
+                if (manual) {
+                    tg.showAlert('Ошибка загрузки данных. Попробуйте позже или отправьте новую геолокацию.');
                 }
             } finally {
                 document.getElementById('loading').classList.add('hidden');
@@ -406,24 +397,34 @@
             document.getElementById('last-update').textContent = time;
         }
         
-        // Загрузка
+        // Первая загрузка
         setTimeout(() => {
+            console.log('Инициализация загрузки...');
             loadLocations(true);
-        }, 500);
+        }, 1000);
         
-        // Автообновление каждые 20 секунд
+        // Автообновление каждые 15 секунд
         setInterval(() => {
+            console.log('Автообновление...');
             loadLocations(false);
-        }, 20000);
+        }, 15000);
         
-        // При возвращении
+        // При возвращении на страницу
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) {
+                console.log('Страница активна - обновление');
                 setTimeout(() => loadLocations(false), 500);
             }
         });
         
-        console.log('Mini App готов');
+        // Обработка изменений размера окна
+        tg.onEvent('viewportChanged', () => {
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 100);
+        });
+        
+        console.log('✅ Mini App инициализирован');
     </script>
 </body>
 </html>
