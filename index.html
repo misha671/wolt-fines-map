@@ -279,43 +279,16 @@
                     setStatus('⏳ Загрузка...', 'loading');
                 }
                 
-                console.log(`[${new Date().toLocaleTimeString()}] Загрузка данных...`);
+                console.log(`[${new Date().toLocaleTimeString()}] Загрузка...`);
                 
-                // Получаем ссылку из file_url.txt или используем из bot_data
-                let TELEGRAM_FILE_URL = null;
+                // Читаем напрямую с GitHub Raw (БЕЗ кеша)
+                const cacheBuster = Date.now() + Math.random();
+                const url = `https://raw.githubusercontent.com/misha671/wolt-fines-map/main/locations.json?t=${cacheBuster}`;
                 
-                // Пробуем загрузить URL из GitHub (бот туда НЕ пишет, вставьте вручную один раз!)
-                try {
-                    const urlResponse = await fetch('https://misha671.github.io/wolt-fines-map/file_url.txt?' + Date.now());
-                    if (urlResponse.ok) {
-                        TELEGRAM_FILE_URL = (await urlResponse.text()).trim();
-                        console.log('URL загружен с GitHub');
-                    }
-                } catch (e) {}
-                
-                // Если не получилось - показываем инструкцию
-                if (!TELEGRAM_FILE_URL) {
-                    setStatus('⚠️ Настройка', 'error');
-                    updateUI(0);
-                    document.getElementById('loading').classList.add('hidden');
-                    
-                    tg.showAlert(
-                        'Настройка карты:\n\n' +
-                        '1. Добавьте бота в канал @wolt_data как админа\n' +
-                        '2. Отправьте геолокацию в топик "Штрафы"\n' +
-                        '3. Бот выведет ссылку в консоли\n' +
-                        '4. Создайте файл file_url.txt на GitHub с этой ссылкой\n' +
-                        '5. Обновите страницу'
-                    );
-                    return;
-                }
-                
-                console.log('Используем URL:', TELEGRAM_FILE_URL);
-                
-                const cacheBuster = Date.now();
-                const response = await fetch(`${TELEGRAM_FILE_URL}?t=${cacheBuster}`, {
+                const response = await fetch(url, {
                     method: 'GET',
-                    cache: 'no-store'
+                    cache: 'no-store',
+                    headers: {'Cache-Control': 'no-cache'}
                 });
                 
                 const data = await response.json();
