@@ -27,8 +27,15 @@
       "timestamp": "2026-01-18T23:52:47.602898",
       "user": "миша",
       "message_id": 87
+    },
+    {
+      "latitude": 32.799838,
+      "longitude": 35.000924,
+      "timestamp": "2026-01-19T00:00:42.959208",
+      "user": "миша",
+      "message_id": 88
     }
   ],
-  "updated_at": "2026-01-18T23:52:47.606867",
-  "total_count": 4
+  "updated_at": "2026-01-19T00:00:42.960219",
+  "total_count": 5
 }
