@@ -1,41 +1,27 @@
 {
   "locations": [
     {
+      "latitude": 32.041045,
+      "longitude": 34.768248,
+      "timestamp": "2026-01-18T22:13:16.874123",
+      "user": "миша",
+      "message_id": 61
+    },
+    {
+      "latitude": 32.045186,
+      "longitude": 34.766444,
+      "timestamp": "2026-01-18T22:13:44.808500",
+      "user": "миша",
+      "message_id": 62
+    },
+    {
       "latitude": 32.040737,
       "longitude": 34.768296,
-      "timestamp": "2026-01-18T12:05:15.192937",
+      "timestamp": "2026-01-18T22:17:17.688583",
       "user": "миша",
-      "message_id": 49
-    },
-    {
-      "latitude": 32.041787,
-      "longitude": 34.771918,
-      "timestamp": "2026-01-18T12:05:22.451048",
-      "user": "миша",
-      "message_id": 50
-    },
-    {
-      "latitude": 32.041039,
-      "longitude": 34.767522,
-      "timestamp": "2026-01-18T12:05:28.338137",
-      "user": "миша",
-      "message_id": 51
-    },
-    {
-      "latitude": 32.04418,
-      "longitude": 34.768023,
-      "timestamp": "2026-01-18T12:17:29.528284",
-      "user": "миша",
-      "message_id": 53
-    },
-    {
-      "latitude": 32.046859,
-      "longitude": 34.768835,
-      "timestamp": "2026-01-18T12:26:05.667170",
-      "user": "миша",
-      "message_id": 54
+      "message_id": 63
     }
   ],
-  "updated_at": "2026-01-18T12:26:05.673171",
-  "total_count": 5
+  "updated_at": "2026-01-18T22:17:17.690583",
+  "total_count": 3
 }
