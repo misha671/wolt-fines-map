@@ -6,8 +6,15 @@
       "timestamp": "2026-01-18T23:40:23.743313",
       "user": "миша",
       "message_id": 80
+    },
+    {
+      "latitude": 32.03931,
+      "longitude": 34.769379,
+      "timestamp": "2026-01-18T23:41:03.808605",
+      "user": "миша",
+      "message_id": 81
     }
   ],
-  "updated_at": "2026-01-18T23:40:23.744312",
-  "total_count": 1
+  "updated_at": "2026-01-18T23:41:03.810605",
+  "total_count": 2
 }
