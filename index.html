@@ -210,7 +210,7 @@
                 }
                 
                 const cacheBuster = Date.now();
-                const url = `https://misha671.github.io/wolt-fines-map/locations.json?t=${cacheBuster}`;
+                const url = `https://raw.githubusercontent.com/misha671/wolt-fines-map/main/locations.json?t=${cacheBuster}`;
                 
                 const response = await fetch(url, {
                     method: 'GET',
@@ -323,7 +323,7 @@
         
         setInterval(() => {
             loadLocations(false);
-        }, 15000);
+        }, 5000);
         
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) {
