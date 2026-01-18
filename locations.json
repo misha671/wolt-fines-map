@@ -13,8 +13,15 @@
       "timestamp": "2026-01-19T00:20:01.340200",
       "user": "Daniel",
       "message_id": 105
+    },
+    {
+      "latitude": 32.040847,
+      "longitude": 34.768626,
+      "timestamp": "2026-01-19T00:23:51.089575",
+      "user": "Daniel",
+      "message_id": 122
     }
   ],
-  "updated_at": "2026-01-19T00:20:01.343202",
-  "total_count": 2
+  "updated_at": "2026-01-19T00:23:51.092576",
+  "total_count": 3
 }
