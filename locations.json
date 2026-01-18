@@ -8,34 +8,13 @@
       "message_id": 92
     },
     {
-      "latitude": 31.963641,
-      "longitude": 34.774783,
-      "timestamp": "2026-01-19T00:18:49.105851",
+      "latitude": 31.963653,
+      "longitude": 34.774763,
+      "timestamp": "2026-01-19T00:20:01.340200",
       "user": "Daniel",
-      "message_id": 95
-    },
-    {
-      "latitude": 32.031174,
-      "longitude": 34.774424,
-      "timestamp": "2026-01-19T00:18:50.983281",
-      "user": "миша",
-      "message_id": 97
-    },
-    {
-      "latitude": 32.040748,
-      "longitude": 34.767584,
-      "timestamp": "2026-01-19T00:18:52.996742",
-      "user": "миша",
-      "message_id": 98
-    },
-    {
-      "latitude": 32.070528,
-      "longitude": 34.772695,
-      "timestamp": "2026-01-19T00:18:55.420298",
-      "user": "Руслан",
-      "message_id": 100
+      "message_id": 105
     }
   ],
-  "updated_at": "2026-01-19T00:18:55.420298",
-  "total_count": 5
+  "updated_at": "2026-01-19T00:20:01.343202",
+  "total_count": 2
 }
