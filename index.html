@@ -365,8 +365,14 @@
 
         /* Hide leaflet controls */
         .leaflet-control-zoom,
-        .leaflet-control-attribution {
+        .leaflet-control-attribution,
+        .leaflet-control {
             display: none !important;
+        }
+        
+        .leaflet-bottom,
+        .leaflet-top {
+            z-index: 400 !important;
         }
     </style>
 </head>
