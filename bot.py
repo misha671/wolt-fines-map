@@ -5,7 +5,7 @@ import requests
 from flask import Flask
 from datetime import datetime
 from base64 import b64encode
-from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     ApplicationBuilder, 
     MessageHandler, 
@@ -149,14 +149,19 @@ async def save_data(context):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
-    if user_id not in context.bot_data.get('users', {}):
+    # Проверяем зарегистрирован ли пользователь
+    users = context.bot_data.setdefault('users', {})
+    
+    if user_id in users:
+        # Пользователь уже зарегистрирован - показываем меню
+        await show_menu(update, context)
+    else:
+        # Новый пользователь - регистрация
         context.bot_data.setdefault('temp_regions', {})[user_id] = set()
         await update.message.reply_text(
             "👋 Привет! Выбери регионы для уведомлений:",
             reply_markup=InlineKeyboardMarkup(build_keyboard(set(), "reg"))
         )
-    else:
-        await show_menu(update, context)
 
 def build_keyboard(selected, prefix):
     kb, row = [], []
@@ -189,7 +194,29 @@ async def show_menu(update, context):
         kb.append([InlineKeyboardButton("👑 Админ", callback_data="admin")])
     
     msg = update.callback_query.message if update.callback_query else update.message
-    await msg.reply_text("Главное меню:", reply_markup=InlineKeyboardMarkup(kb))
+    
+    # Создаём кнопку меню снизу
+    reply_kb = ReplyKeyboardMarkup(
+        [[KeyboardButton("📍 Меню")]],
+        resize_keyboard=True
+    )
+    
+    await msg.reply_text(
+        "Главное меню:",
+        reply_markup=InlineKeyboardMarkup(kb)
+    )
+    
+    # Отправляем отдельно кнопку меню
+    if not update.callback_query:
+        await update.message.reply_text(
+            "Используй кнопку ниже для быстрого доступа:",
+            reply_markup=reply_kb
+        )
+
+async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик кнопки 📍 Меню"""
+    if update.message.text == "📍 Меню":
+        await show_menu(update, context)
 
 async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"\n{'='*60}")
@@ -216,7 +243,6 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"Thread ID: {post.message_thread_id}")
     
     # ✅ ПРИНИМАЕМ ГЕОМЕТКИ ИЗ ЛЮБОГО КАНАЛА И ЛИЧНЫХ СООБЩЕНИЙ
-    # Убираем проверку на конкретный ID канала
     is_valid_chat = (
         post.chat.type in ['supergroup', 'group', 'private', 'channel']
     )
@@ -277,6 +303,14 @@ async def notify_users(context, loc_data):
         
         if notifications_on and has_region:
             try:
+                # ✅ СНАЧАЛА ГЕОЛОКАЦИЯ
+                await context.bot.send_location(
+                    chat_id=uid,
+                    latitude=loc_data['latitude'],
+                    longitude=loc_data['longitude']
+                )
+                
+                # ✅ ПОТОМ ТЕКСТ
                 msg = (
                     f"🚨 <b>Новая метка!</b>\n\n"
                     f"📍 Район: <b>{r_name}</b>\n"
@@ -292,12 +326,6 @@ async def notify_users(context, loc_data):
                     text=msg,
                     parse_mode='HTML',
                     reply_markup=InlineKeyboardMarkup(kb)
-                )
-                
-                await context.bot.send_location(
-                    chat_id=uid,
-                    latitude=loc_data['latitude'],
-                    longitude=loc_data['longitude']
                 )
                 
                 sent += 1
@@ -330,7 +358,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'notifications': True
         }
         print(f"✅ User {uid} registered: {sel}")
-        await query.edit_message_text("✅ Настройка завершена! Жми /start")
+        await query.edit_message_text("✅ Настройка завершена! Нажми /start для открытия меню")
 
     elif data == "settings":
         udata = context.bot_data.setdefault('users', {}).get(uid, {})
@@ -457,6 +485,7 @@ def main():
     
     # Регистрация хендлеров
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler))  # Для кнопки меню
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.LOCATION, handle_location))
     
