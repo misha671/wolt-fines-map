@@ -218,6 +218,92 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     if update.message.text == "📍 Меню":
         await show_menu(update, context)
 
+async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Добавление админа - /addadmin USER_ID"""
+    uid = update.effective_user.id
+    
+    # Только супер-админ может добавлять админов
+    if uid != SUPER_ADMIN_ID:
+        await update.message.reply_text("❌ Только супер-админ может добавлять админов")
+        return
+    
+    # Проверяем аргументы
+    if not context.args or len(context.args) != 1:
+        await update.message.reply_text(
+            "❌ Неправильный формат\n\n"
+            "Используй: <code>/addadmin USER_ID</code>\n"
+            "Пример: <code>/addadmin 123456789</code>",
+            parse_mode='HTML'
+        )
+        return
+    
+    try:
+        new_admin_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("❌ USER_ID должен быть числом")
+        return
+    
+    # Добавляем админа
+    admins = context.bot_data.setdefault('admins', set())
+    
+    if new_admin_id in admins:
+        await update.message.reply_text(f"⚠️ Пользователь <code>{new_admin_id}</code> уже является админом", parse_mode='HTML')
+        return
+    
+    if new_admin_id == SUPER_ADMIN_ID:
+        await update.message.reply_text("⚠️ Это супер-админ, он и так имеет все права")
+        return
+    
+    admins.add(new_admin_id)
+    await update.message.reply_text(
+        f"✅ Пользователь <code>{new_admin_id}</code> добавлен в админы\n\n"
+        f"Всего админов: {len(admins)}",
+        parse_mode='HTML'
+    )
+    
+    print(f"👮 Super-admin {uid} added admin {new_admin_id}")
+
+async def remove_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Удаление админа - /removeadmin USER_ID"""
+    uid = update.effective_user.id
+    
+    # Только супер-админ может удалять админов
+    if uid != SUPER_ADMIN_ID:
+        await update.message.reply_text("❌ Только супер-админ может удалять админов")
+        return
+    
+    # Проверяем аргументы
+    if not context.args or len(context.args) != 1:
+        await update.message.reply_text(
+            "❌ Неправильный формат\n\n"
+            "Используй: <code>/removeadmin USER_ID</code>\n"
+            "Пример: <code>/removeadmin 123456789</code>",
+            parse_mode='HTML'
+        )
+        return
+    
+    try:
+        admin_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("❌ USER_ID должен быть числом")
+        return
+    
+    # Удаляем админа
+    admins = context.bot_data.get('admins', set())
+    
+    if admin_id not in admins:
+        await update.message.reply_text(f"⚠️ Пользователь <code>{admin_id}</code> не является админом", parse_mode='HTML')
+        return
+    
+    admins.remove(admin_id)
+    await update.message.reply_text(
+        f"✅ Пользователь <code>{admin_id}</code> удалён из админов\n\n"
+        f"Всего админов: {len(admins)}",
+        parse_mode='HTML'
+    )
+    
+    print(f"👮 Super-admin {uid} removed admin {admin_id}")
+
 async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"\n{'='*60}")
     print(f"📍 LOCATION RECEIVED")
@@ -405,21 +491,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "admin":
         # Админ панель
-        if uid != SUPER_ADMIN_ID:
+        if uid != SUPER_ADMIN_ID and uid not in context.bot_data.get('admins', set()):
             await query.answer("❌ Недостаточно прав", show_alert=True)
             return
         
         total_users = len(context.bot_data.get('users', {}))
         total_locations = len(context.bot_data.get('locations', []))
+        total_admins = len(context.bot_data.get('admins', set()))
         
         txt = (
             f"👑 <b>Админ панель</b>\n\n"
             f"👥 Пользователей: {total_users}\n"
             f"📍 Меток сохранено: {total_locations}\n"
+            f"👮 Админов: {total_admins}\n"
         )
         
         kb = [
             [InlineKeyboardButton("📊 Статистика", callback_data="admin_stats")],
+            [InlineKeyboardButton("🗑 Удалить все метки", callback_data="admin_clear_locations")],
+            [InlineKeyboardButton("👮 Управление админами", callback_data="admin_manage_admins")],
             [InlineKeyboardButton("« Назад", callback_data="main")]
         ]
         
@@ -444,6 +534,65 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📊 <b>Статистика по регионам</b>\n\n"
             f"{stats_text if stats_text else 'Нет данных'}"
         )
+        
+        kb = [[InlineKeyboardButton("« Назад", callback_data="admin")]]
+        await query.edit_message_text(txt, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(kb))
+    
+    elif data == "admin_clear_locations":
+        # Подтверждение удаления
+        if uid != SUPER_ADMIN_ID and uid not in context.bot_data.get('admins', set()):
+            await query.answer("❌ Недостаточно прав", show_alert=True)
+            return
+        
+        total = len(context.bot_data.get('locations', []))
+        txt = (
+            f"⚠️ <b>Подтверждение удаления</b>\n\n"
+            f"Вы уверены что хотите удалить <b>все {total} меток</b>?\n\n"
+            f"Это действие нельзя отменить!"
+        )
+        
+        kb = [
+            [InlineKeyboardButton("✅ Да, удалить все", callback_data="admin_clear_confirm")],
+            [InlineKeyboardButton("❌ Отмена", callback_data="admin")]
+        ]
+        
+        await query.edit_message_text(txt, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(kb))
+    
+    elif data == "admin_clear_confirm":
+        # Выполняем удаление
+        if uid != SUPER_ADMIN_ID and uid not in context.bot_data.get('admins', set()):
+            await query.answer("❌ Недостаточно прав", show_alert=True)
+            return
+        
+        deleted_count = len(context.bot_data.get('locations', []))
+        context.bot_data['locations'] = []
+        
+        # Сохраняем пустой список в GitHub
+        await save_data(context)
+        
+        txt = f"✅ Удалено {deleted_count} меток\n\nДанные обновлены в GitHub"
+        
+        kb = [[InlineKeyboardButton("« Назад в админку", callback_data="admin")]]
+        await query.edit_message_text(txt, reply_markup=InlineKeyboardMarkup(kb))
+        
+        print(f"🗑️ Admin {uid} deleted all {deleted_count} locations")
+    
+    elif data == "admin_manage_admins":
+        # Управление админами (только для супер-админа)
+        if uid != SUPER_ADMIN_ID:
+            await query.answer("❌ Только для супер-админа", show_alert=True)
+            return
+        
+        admins = context.bot_data.get('admins', set())
+        
+        if admins:
+            admins_list = "\n".join([f"• ID: <code>{admin_id}</code>" for admin_id in admins])
+            txt = f"👮 <b>Список админов</b>\n\n{admins_list}\n\n"
+        else:
+            txt = "👮 <b>Список админов</b>\n\nАдминов пока нет\n\n"
+        
+        txt += "Для добавления админа отправь команду:\n<code>/addadmin USER_ID</code>\n\n"
+        txt += "Для удаления админа отправь команду:\n<code>/removeadmin USER_ID</code>"
         
         kb = [[InlineKeyboardButton("« Назад", callback_data="admin")]]
         await query.edit_message_text(txt, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(kb))
@@ -485,6 +634,8 @@ def main():
     
     # Регистрация хендлеров
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("addadmin", add_admin))
+    app.add_handler(CommandHandler("removeadmin", remove_admin))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler))  # Для кнопки меню
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.LOCATION, handle_location))
