@@ -29,14 +29,22 @@ SUPER_ADMIN_ID = 913627492
 DATA_PATH = "/data/bot_data.pickle" if os.path.exists("/data") else "bot_data.pickle"
 
 # --- FLASK SERVER (Для Web Service) ---
+# --- FLASK SERVER (Для предотвращения "засыпания") ---
 app = Flask(__name__)
 
 @app.route('/')
-def health_check():
-    return "Bot is running on Paid Render Plan with Persistent Disk!", 200
+def home():
+    # Ответ для захода через браузер
+    return "Bot is running! Keep me awake, please.", 200
+
+@app.route('/health')
+def health():
+    # Специальный ответ для UptimeRobot
+    return {"status": "ok", "message": "I am alive!"}, 200
 
 def run_flask():
-    port = int(os.environ.get("PORT", 5000))
+    # Render сам назначит нужный порт
+    port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
 # --- ВАШ КОД (РЕГИОНЫ И ЛОГИКА) ---
