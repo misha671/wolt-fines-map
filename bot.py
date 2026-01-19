@@ -317,14 +317,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data.startswith("reg_") and data != "reg_done":
         rid = data[4:]
-        temp = context.bot_data['temp_regions'][uid]
+        temp = context.bot_data.setdefault('temp_regions', {}).setdefault(uid, set())
         temp.remove(rid) if rid in temp else temp.add(rid)
         await query.edit_message_reply_markup(
             reply_markup=InlineKeyboardMarkup(build_keyboard(temp, "reg"))
         )
     
     elif data == "reg_done":
-        sel = list(context.bot_data['temp_regions'].pop(uid, []))
+        sel = list(context.bot_data.setdefault('temp_regions', {}).pop(uid, []))
         context.bot_data.setdefault('users', {})[uid] = {
             'regions': sel,
             'notifications': True
@@ -333,7 +333,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("✅ Настройка завершена! Жми /start")
 
     elif data == "settings":
-        udata = context.bot_data['users'].get(uid, {})
+        udata = context.bot_data.setdefault('users', {}).get(uid, {})
         notif = "✅ Включены" if udata.get('notifications') else "❌ Выключены"
         txt = (
             f"⚙️ <b>Настройки</b>\n\n"
@@ -348,11 +348,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(txt, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(kb))
 
     elif data == "notif_toggle":
-        context.bot_data['users'][uid]['notifications'] = not context.bot_data['users'][uid].get('notifications')
+        users = context.bot_data.setdefault('users', {})
+        if uid in users:
+            users[uid]['notifications'] = not users[uid].get('notifications')
         await button_handler(update, context)
 
     elif data == "set_regs":
-        current = set(context.bot_data['users'][uid].get('regions', []))
+        current = set(context.bot_data.setdefault('users', {}).get(uid, {}).get('regions', []))
         context.bot_data.setdefault('temp_regions', {})[uid] = current
         await query.edit_message_text(
             "Выбери регионы:",
@@ -361,17 +363,62 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif data.startswith("setreg_"):
         rid = data[7:]
-        temp = context.bot_data['temp_regions'][uid]
+        temp = context.bot_data.setdefault('temp_regions', {}).setdefault(uid, set())
         temp.remove(rid) if rid in temp else temp.add(rid)
         await query.edit_message_reply_markup(
             reply_markup=InlineKeyboardMarkup(build_keyboard(temp, "setreg"))
         )
     
     elif data == "set_done":
-        sel = list(context.bot_data['temp_regions'].pop(uid, []))
-        context.bot_data['users'][uid]['regions'] = sel
+        sel = list(context.bot_data.setdefault('temp_regions', {}).pop(uid, []))
+        context.bot_data.setdefault('users', {})[uid]['regions'] = sel
         await query.edit_message_text("✅ Регионы обновлены!")
         await show_menu(update, context)
+
+    elif data == "admin":
+        # Админ панель
+        if uid != SUPER_ADMIN_ID:
+            await query.answer("❌ Недостаточно прав", show_alert=True)
+            return
+        
+        total_users = len(context.bot_data.get('users', {}))
+        total_locations = len(context.bot_data.get('locations', []))
+        
+        txt = (
+            f"👑 <b>Админ панель</b>\n\n"
+            f"👥 Пользователей: {total_users}\n"
+            f"📍 Меток сохранено: {total_locations}\n"
+        )
+        
+        kb = [
+            [InlineKeyboardButton("📊 Статистика", callback_data="admin_stats")],
+            [InlineKeyboardButton("« Назад", callback_data="main")]
+        ]
+        
+        await query.edit_message_text(txt, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(kb))
+    
+    elif data == "admin_stats":
+        # Детальная статистика
+        users = context.bot_data.get('users', {})
+        
+        # Считаем по регионам
+        region_stats = {}
+        for uid, udata in users.items():
+            for region in udata.get('regions', []):
+                region_stats[region] = region_stats.get(region, 0) + 1
+        
+        stats_text = "\n".join([
+            f"• {REGIONS[rid]['name']}: {count} чел."
+            for rid, count in sorted(region_stats.items(), key=lambda x: -x[1])
+        ])
+        
+        txt = (
+            f"📊 <b>Статистика по регионам</b>\n\n"
+            f"{stats_text if stats_text else 'Нет данных'}"
+        )
+        
+        kb = [[InlineKeyboardButton("« Назад", callback_data="admin")]]
+        await query.edit_message_text(txt, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(kb))
 
     elif data == "main":
         await show_menu(update, context)
