@@ -121,6 +121,45 @@
             font-weight: 500;
         }
 
+        /* Server Status */
+        .server-status {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            z-index: 1000;
+            background: var(--wolt-white);
+            padding: 8px 12px;
+            border-radius: 20px;
+            box-shadow: var(--shadow-md);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--wolt-dark);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-dot.online {
+            background: #00B37A;
+            box-shadow: 0 0 6px rgba(0, 179, 122, 0.5);
+        }
+
+        .status-dot.offline {
+            background: var(--wolt-red);
+            box-shadow: 0 0 6px rgba(227, 64, 64, 0.5);
+        }
+
+        .status-dot.checking {
+            background: var(--wolt-orange);
+            animation: blink 1s ease-in-out infinite;
+        }
+
         /* Controls */
         .controls {
             position: absolute;
@@ -398,6 +437,12 @@
         </div>
     </div>
 
+    <!-- Server Status -->
+    <div class="server-status" id="serverStatus">
+        <div class="status-dot online"></div>
+        <span>Online</span>
+    </div>
+
     <!-- Controls -->
     <div class="controls">
         <button class="ctrl-btn" id="zoomIn" title="Zoom in">
@@ -462,6 +507,7 @@
         }
 
         async function loadData() {
+            updateServerStatus('checking');
             try {
                 const response = await fetch(DATA_URL + '?t=' + Date.now());
                 const data = await response.json();
@@ -469,9 +515,27 @@
                 locationsData = data.locations || [];
                 updateMarkers();
                 updateStats();
+                updateServerStatus('online');
                 
             } catch (error) {
                 console.error('Error loading data:', error);
+                updateServerStatus('offline');
+            }
+        }
+
+        function updateServerStatus(status) {
+            const statusEl = document.getElementById('serverStatus');
+            const dot = statusEl.querySelector('.status-dot');
+            const text = statusEl.querySelector('span');
+            
+            dot.className = 'status-dot ' + status;
+            
+            if (status === 'online') {
+                text.textContent = 'Online';
+            } else if (status === 'offline') {
+                text.textContent = 'Offline';
+            } else {
+                text.textContent = 'Checking...';
             }
         }
 
