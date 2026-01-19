@@ -10,8 +10,8 @@ from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, fil
 
 # --- КОНФИГУРАЦИЯ ---
 # Токены берем из настроек Render (Environment Variables)
-BOT_TOKEN = os.getenv("8594027179:AAHDMDX_uplAlZY14tC9WmULqq8i4rERtbM")
-GITHUB_TOKEN = os.getenv("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")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 # Остальные настройки
 CHANNEL_USERNAME = "@woltwarn"
