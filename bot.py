@@ -1,24 +1,24 @@
 import os
 import json
-import threading
 import requests
-from flask import Flask
+from flask import Flask, request
 from datetime import datetime
 from base64 import b64encode
 from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, 
-    MessageHandler, 
-    CommandHandler, 
-    filters, 
-    ContextTypes, 
-    CallbackQueryHandler, 
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    filters,
+    ContextTypes,
     PicklePersistence
 )
 
 # --- КОНФИГУРАЦИЯ ---
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://wolt-fines-map.onrender.com")  # Твой URL на Render
 
 CHANNEL_USERNAME = "@woltwarn"
 CHANNEL_ID = -1003410531789
@@ -30,20 +30,9 @@ GITHUB_REPO = "wolt-fines-map"
 GITHUB_FILE = "locations.json"
 SUPER_ADMIN_ID = 913627492
 
-# --- FLASK SERVER ---
+# --- FLASK + BOT APPLICATION ---
 server = Flask(__name__)
-
-@server.route('/')
-def home():
-    return "Bot is running!", 200
-
-@server.route('/health')
-def health_check():
-    return {"status": "ok", "message": "I am alive!"}, 200
-
-def run_flask():
-    port = int(os.environ.get("PORT", 10000))
-    server.run(host='0.0.0.0', port=port)
+application = None
 
 # --- РЕГИОНЫ ---
 REGIONS = {
@@ -80,16 +69,12 @@ def get_location_region(latitude, longitude):
         if dist <= r_data['radius']:
             print(f"📍 Region: {r_data['name']} (dist: {dist:.2f}km)")
             return r_id
-    print(f"⚠️ No region match for: {latitude}, {longitude}")
+    print(f"⚠️ No region match")
     return None
 
 def upload_to_github(data):
-    """Загрузка в GitHub"""
     try:
-        print(f"\n{'='*60}")
-        print(f"🔄 GITHUB UPLOAD START")
-        print(f"{'='*60}")
-        print(f"Locations to upload: {len(data.get('locations', []))}")
+        print(f"🔄 GitHub upload: {len(data.get('locations', []))} locations")
         
         url = f"https://api.github.com/repos/{GITHUB_USERNAME}/{GITHUB_REPO}/contents/{GITHUB_FILE}"
         headers = {
@@ -97,22 +82,9 @@ def upload_to_github(data):
             "Accept": "application/vnd.github.v3+json"
         }
         
-        # Получаем SHA
-        print(f"📡 GET {url}")
         res = requests.get(url, headers=headers, timeout=10)
-        print(f"Response: {res.status_code}")
+        sha = res.json().get("sha") if res.status_code == 200 else None
         
-        if res.status_code == 200:
-            sha = res.json().get("sha")
-            print(f"✅ File exists, SHA: {sha[:10]}...")
-        elif res.status_code == 404:
-            sha = None
-            print(f"⚠️ File not found, will create new")
-        else:
-            print(f"❌ Unexpected response: {res.text[:200]}")
-            return
-        
-        # Подготовка
         content = json.dumps(data, ensure_ascii=False, indent=2)
         payload = {
             "message": f"Update: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
@@ -121,26 +93,17 @@ def upload_to_github(data):
         if sha:
             payload["sha"] = sha
         
-        # Отправка
-        print(f"📤 PUT to GitHub...")
         res = requests.put(url, headers=headers, json=payload, timeout=10)
-        print(f"Response: {res.status_code}")
         
         if res.status_code in [200, 201]:
-            print(f"✅ SUCCESS! GitHub updated")
-            print(f"🔗 https://github.com/{GITHUB_USERNAME}/{GITHUB_REPO}/blob/main/{GITHUB_FILE}")
+            print(f"✅ GitHub updated")
         else:
-            print(f"❌ FAILED: {res.text[:200]}")
-        
-        print(f"{'='*60}\n")
+            print(f"❌ GitHub error: {res.status_code}")
         
     except Exception as e:
         print(f"❌ Exception: {e}")
-        import traceback
-        traceback.print_exc()
 
 async def save_data(context):
-    """Сохранение"""
     locations = context.bot_data.get('locations', [])
     data = {
         'locations': locations,
@@ -176,10 +139,10 @@ def build_keyboard(selected, prefix):
     if row:
         kb.append(row)
     
-    if prefix == "reg":
-        kb.append([InlineKeyboardButton("✅ Готово", callback_data="reg_done")])
-    else:
-        kb.append([InlineKeyboardButton("✅ Сохранить", callback_data="set_done")])
+    kb.append([InlineKeyboardButton(
+        "✅ Готово" if prefix == "reg" else "✅ Сохранить",
+        callback_data=f"{prefix}_done"
+    )])
     return kb
 
 async def show_menu(update, context):
@@ -189,53 +152,28 @@ async def show_menu(update, context):
         [InlineKeyboardButton("⚙️ Настройки", callback_data="settings")]
     ]
     
-    if uid == SUPER_ADMIN_ID or uid in context.bot_data.get('admins', set()):
+    if uid == SUPER_ADMIN_ID:
         kb.append([InlineKeyboardButton("👑 Админ", callback_data="admin")])
     
     msg = update.callback_query.message if update.callback_query else update.message
     await msg.reply_text("Главное меню:", reply_markup=InlineKeyboardMarkup(kb))
 
 async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик геолокации"""
-    print(f"\n{'='*60}")
-    print(f"📍 LOCATION RECEIVED")
-    print(f"{'='*60}")
+    print(f"\n📍 LOCATION RECEIVED")
     
-    # Определяем источник
     post = update.channel_post or update.message
     
-    if not post:
-        print("❌ No post")
+    if not post or not post.location:
         return
     
-    if not post.location:
-        print("❌ No location")
+    print(f"Chat: {post.chat.id}, Location: {post.location.latitude}, {post.location.longitude}")
+    
+    is_valid = post.chat.id == CHANNEL_ID or post.chat.type == 'private'
+    
+    if not is_valid:
+        print(f"⚠️ Wrong chat")
         return
     
-    # Логируем детали
-    print(f"Chat ID: {post.chat.id}")
-    print(f"Chat Type: {post.chat.type}")
-    print(f"Message ID: {post.message_id}")
-    print(f"From User: {post.from_user.first_name if post.from_user else 'None'}")
-    print(f"Location: {post.location.latitude}, {post.location.longitude}")
-    
-    # Проверка на тред
-    if hasattr(post, 'message_thread_id') and post.message_thread_id:
-        print(f"Thread ID: {post.message_thread_id}")
-    
-    # Проверка чата - принимаем И канал, И личные сообщения
-    is_valid_chat = (
-        post.chat.id == CHANNEL_ID or 
-        post.chat.type == 'private'
-    )
-    
-    if not is_valid_chat:
-        print(f"⚠️ Wrong chat: {post.chat.id} (need {CHANNEL_ID} or private)")
-        return
-    
-    print(f"✅ Chat OK")
-    
-    # Создаём локацию
     loc = {
         'latitude': post.location.latitude,
         'longitude': post.location.longitude,
@@ -244,51 +182,30 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'message_id': post.message_id
     }
     
-    print(f"\n📝 Location object:")
-    print(json.dumps(loc, indent=2, ensure_ascii=False))
-    
-    # Сохраняем
     context.bot_data.setdefault('locations', []).append(loc)
     context.bot_data['locations'] = context.bot_data['locations'][-200:]
     
-    print(f"\n💾 Total in memory: {len(context.bot_data['locations'])}")
+    print(f"💾 Saved. Total: {len(context.bot_data['locations'])}")
     
-    # GitHub
-    print(f"\n🔄 Saving to GitHub...")
     await save_data(context)
-    
-    # Уведомления
-    print(f"\n📢 Notifying users...")
     await notify_users(context, loc)
-    
-    print(f"{'='*60}\n")
 
 async def notify_users(context, loc_data):
-    """Уведомления"""
-    print(f"📢 NOTIFY START")
+    print(f"📢 Notifying users")
     
     rid = get_location_region(loc_data['latitude'], loc_data['longitude'])
     
     if not rid:
-        print("⚠️ No region - skipping notifications")
         return
     
     r_name = REGIONS[rid]['name']
     time_str = datetime.fromisoformat(loc_data['timestamp']).strftime('%H:%M')
     
     users = context.bot_data.get('users', {})
-    print(f"👥 Users: {len(users)}")
-    
     sent = 0
+    
     for uid, udata in users.items():
-        notifications_on = udata.get('notifications', False)
-        has_region = rid in udata.get('regions', [])
-        
-        print(f"\nUser {uid}:")
-        print(f"  Notifications: {notifications_on}")
-        print(f"  Has region: {has_region}")
-        
-        if notifications_on and has_region:
+        if udata.get('notifications') and rid in udata.get('regions', []):
             try:
                 msg = (
                     f"🚨 <b>Новая метка!</b>\n\n"
@@ -314,14 +231,11 @@ async def notify_users(context, loc_data):
                 )
                 
                 sent += 1
-                print(f"  ✅ Sent")
                 
             except Exception as e:
-                print(f"  ❌ Error: {e}")
-        else:
-            print(f"  ⏭ Skip")
+                print(f"❌ Error sending to {uid}: {e}")
     
-    print(f"\n📊 Sent to {sent}/{len(users)} users")
+    print(f"📊 Sent to {sent} users")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -342,7 +256,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'regions': sel,
             'notifications': True
         }
-        print(f"✅ User {uid} registered: {sel}")
         await query.edit_message_text("✅ Настройка завершена! Жми /start")
 
     elif data == "settings":
@@ -389,31 +302,66 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "main":
         await show_menu(update, context)
 
+# --- FLASK ROUTES ---
+@server.route('/')
+def home():
+    return "Bot is running!", 200
+
+@server.route('/health')
+def health_check():
+    return {"status": "ok"}, 200
+
+@server.route(f'/{BOT_TOKEN}', methods=['POST'])
+async def webhook():
+    """Webhook для получения обновлений от Telegram"""
+    try:
+        update = Update.de_json(request.get_json(force=True), application.bot)
+        await application.process_update(update)
+        return 'ok', 200
+    except Exception as e:
+        print(f"❌ Webhook error: {e}")
+        return 'error', 500
+
 # --- ЗАПУСК ---
 def main():
+    global application
+    
     print(f"\n{'='*60}")
-    print(f"🚀 BOT STARTING")
+    print(f"🚀 BOT STARTING (WEBHOOK MODE)")
     print(f"{'='*60}")
     print(f"Bot Token: {'SET' if BOT_TOKEN else 'MISSING'}")
     print(f"GitHub Token: {'SET' if GITHUB_TOKEN else 'MISSING'}")
-    print(f"Channel: {CHANNEL_ID}")
-    print(f"Admin: {SUPER_ADMIN_ID}")
+    print(f"Webhook URL: {WEBHOOK_URL}")
     print(f"{'='*60}\n")
     
-    threading.Thread(target=run_flask, daemon=True).start()
-    
+    # Создаём приложение
     persistence = PicklePersistence(filepath="bot_data.pickle")
-    app = ApplicationBuilder().token(BOT_TOKEN).persistence(persistence).build()
+    application = (
+        Application.builder()
+        .token(BOT_TOKEN)
+        .persistence(persistence)
+        .build()
+    )
     
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(MessageHandler(filters.LOCATION, handle_location))
+    # Регистрируем хендлеры
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(button_handler))
+    application.add_handler(MessageHandler(filters.LOCATION, handle_location))
     
-    print("🤖 Bot started!")
-    print(f"📊 Flask on port {os.environ.get('PORT', 10000)}")
-    print(f"🎯 Listening for locations\n")
+    # Устанавливаем webhook
+    import asyncio
+    asyncio.run(application.bot.set_webhook(
+        url=f"{WEBHOOK_URL}/{BOT_TOKEN}",
+        allowed_updates=["message", "channel_post", "callback_query"]
+    ))
     
-    app.run_polling(drop_pending_updates=True)
+    print("✅ Webhook установлен")
+    print(f"🎯 Webhook URL: {WEBHOOK_URL}/{BOT_TOKEN}")
+    
+    # Запускаем Flask
+    port = int(os.environ.get("PORT", 10000))
+    print(f"🚀 Starting Flask on port {port}\n")
+    server.run(host='0.0.0.0', port=port)
 
 if __name__ == '__main__':
     main()
