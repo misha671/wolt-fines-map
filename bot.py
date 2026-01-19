@@ -77,13 +77,18 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 
 def get_location_region(latitude, longitude):
     for r_id, r_data in REGIONS.items():
-        if calculate_distance(latitude, longitude, *r_data['coords']) <= r_data['radius']:
+        dist = calculate_distance(latitude, longitude, *r_data['coords'])
+        if dist <= r_data['radius']:
+            print(f"📍 Location matched region: {r_data['name']} (distance: {dist:.2f}km)")
             return r_id
+    print(f"⚠️ Location not in any region: {latitude}, {longitude}")
     return None
 
 def upload_to_github(data):
     """Загрузка данных в GitHub с правильной обработкой ошибок"""
     try:
+        print(f"🔄 Starting GitHub upload... Locations count: {len(data.get('locations', []))}")
+        
         url = f"https://api.github.com/repos/{GITHUB_USERNAME}/{GITHUB_REPO}/contents/{GITHUB_FILE}"
         headers = {
             "Authorization": f"token {GITHUB_TOKEN}", 
@@ -91,8 +96,10 @@ def upload_to_github(data):
         }
         
         # Получаем текущий SHA файла
+        print(f"🔍 Getting current file SHA...")
         res = requests.get(url, headers=headers)
         sha = res.json().get("sha") if res.status_code == 200 else None
+        print(f"📄 Current SHA: {sha[:10] if sha else 'None'}")
         
         # Подготовка контента
         content = json.dumps(data, ensure_ascii=False, indent=2)
@@ -104,15 +111,20 @@ def upload_to_github(data):
             payload["sha"] = sha
         
         # Отправка на GitHub
+        print(f"📤 Uploading to GitHub...")
         response = requests.put(url, headers=headers, json=payload)
         
         if response.status_code in [200, 201]:
-            print(f"✅ GitHub updated: {len(data.get('locations', []))} locations")
+            print(f"✅ GitHub updated successfully: {len(data.get('locations', []))} locations")
+            print(f"🔗 File URL: https://github.com/{GITHUB_USERNAME}/{GITHUB_REPO}/blob/main/{GITHUB_FILE}")
         else:
-            print(f"❌ GitHub Error: {response.status_code} - {response.text}")
+            print(f"❌ GitHub Error: {response.status_code}")
+            print(f"❌ Response: {response.text[:200]}")
             
     except Exception as e: 
-        print(f"❌ GitHub Upload Error: {e}")
+        print(f"❌ GitHub Upload Exception: {e}")
+        import traceback
+        traceback.print_exc()
 
 async def save_data(context):
     """Сохранение данных в GitHub"""
@@ -122,6 +134,7 @@ async def save_data(context):
         'updated_at': datetime.now().isoformat(),
         'total_count': len(locations)
     }
+    print(f"💾 Saving data to GitHub: {len(locations)} locations")
     upload_to_github(data)
 
 # --- ХЕНДЛЕРЫ ---
@@ -175,13 +188,29 @@ async def show_menu(update, context):
 
 async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка геолокации из канала или личных сообщений"""
+    print("\n" + "="*50)
+    print("📍 LOCATION HANDLER TRIGGERED")
+    print("="*50)
+    
     post = update.channel_post or update.message
-    if not post or not post.location: 
+    
+    if not post:
+        print("❌ No post found")
+        return
+        
+    if not post.location:
+        print("❌ No location in post")
         return
     
-    # Проверяем, что геометка из нужного канала
-    if post.chat.id != CHANNEL_ID: 
+    print(f"✅ Post found: chat_id={post.chat.id}, message_id={post.message_id}")
+    print(f"✅ Location: lat={post.location.latitude}, lon={post.location.longitude}")
+    
+    # Проверяем, что геометка из нужного канала ИЛИ личного чата
+    if post.chat.id != CHANNEL_ID and post.chat.type != 'private':
+        print(f"⚠️ Wrong chat: {post.chat.id} (expected {CHANNEL_ID} or private)")
         return
+    
+    print(f"✅ Chat verified: {post.chat.id}")
 
     # Создаем объект локации с правильными полями
     loc = {
@@ -189,8 +218,11 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'longitude': post.location.longitude,
         'timestamp': datetime.now().isoformat(),
         'user': post.from_user.first_name if post.from_user else "Admin",
-        'message_id': post.message_id  # ✅ ВАЖНО: добавляем message_id
+        'message_id': post.message_id
     }
+    
+    print(f"📝 Location object created:")
+    print(json.dumps(loc, indent=2, ensure_ascii=False))
     
     # Сохраняем в bot_data
     context.bot_data.setdefault('locations', []).append(loc)
@@ -198,27 +230,48 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Оставляем только последние 200 меток
     context.bot_data['locations'] = context.bot_data['locations'][-200:]
     
-    # ✅ Сохраняем в GitHub
+    print(f"💾 Total locations in memory: {len(context.bot_data['locations'])}")
+    
+    # Сохраняем в GitHub
+    print("🔄 Calling save_data...")
     await save_data(context)
     
     # Уведомляем пользователей
+    print("📢 Calling notify_users...")
     await notify_users(context, loc)
     
-    print(f"📍 New location saved: {loc['user']} at {loc['timestamp']}")
+    print("✅ Location handler completed successfully")
+    print("="*50 + "\n")
 
 async def notify_users(context, loc_data):
     """Отправка уведомлений пользователям - СТАРОЕ ОФОРМЛЕНИЕ"""
+    print(f"\n📢 NOTIFY_USERS called")
+    print(f"Location: {loc_data['latitude']}, {loc_data['longitude']}")
+    
     rid = get_location_region(loc_data['latitude'], loc_data['longitude'])
-    if not rid: 
+    
+    if not rid:
+        print("⚠️ Location not in any region - no notifications sent")
         return
     
     r_name = REGIONS[rid]['name']
     time_str = datetime.fromisoformat(loc_data['timestamp']).strftime('%H:%M')
     
-    for uid, udata in context.bot_data.get('users', {}).items():
+    users = context.bot_data.get('users', {})
+    print(f"👥 Total users: {len(users)}")
+    
+    notified_count = 0
+    for uid, udata in users.items():
+        print(f"\n👤 Checking user {uid}:")
+        print(f"  - Notifications enabled: {udata.get('notifications')}")
+        print(f"  - User regions: {udata.get('regions', [])}")
+        print(f"  - Location region: {rid}")
+        
         if udata.get('notifications') and rid in udata.get('regions', []):
             try:
-                # ✅ СТАРОЕ ОФОРМЛЕНИЕ - сначала текст с эмодзи
+                print(f"  ✅ Sending notification to {uid}...")
+                
+                # Текст с эмодзи
                 msg = (
                     f"🚨 <b>Новая метка!</b>\n\n"
                     f"📍 Район: <b>{r_name}</b>\n"
@@ -244,8 +297,15 @@ async def notify_users(context, loc_data):
                     longitude=loc_data['longitude']
                 )
                 
+                notified_count += 1
+                print(f"  ✅ Notification sent to {uid}")
+                
             except Exception as e:
-                print(f"❌ Failed to notify user {uid}: {e}")
+                print(f"  ❌ Failed to notify user {uid}: {e}")
+        else:
+            print(f"  ⏭ Skipping user {uid} (notifications off or wrong region)")
+    
+    print(f"\n📊 Notifications sent: {notified_count} out of {len(users)} users")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка нажатий на кнопки"""
@@ -269,6 +329,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'regions': sel, 
             'notifications': True
         }
+        print(f"✅ User {uid} registered with regions: {sel}")
         await query.edit_message_text("✅ Настройка завершена! Жми /start")
 
     elif data == "settings":
@@ -323,6 +384,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- ЗАПУСК ---
 def main():
+    print("\n" + "="*50)
+    print("🚀 STARTING BOT")
+    print("="*50)
+    print(f"Bot Token: {'✅ Set' if BOT_TOKEN else '❌ Missing'}")
+    print(f"GitHub Token: {'✅ Set' if GITHUB_TOKEN else '❌ Missing'}")
+    print(f"Channel ID: {CHANNEL_ID}")
+    print(f"Super Admin ID: {SUPER_ADMIN_ID}")
+    print("="*50 + "\n")
+    
     # Запускаем Flask в отдельном потоке
     threading.Thread(target=run_flask, daemon=True).start()
     
@@ -335,11 +405,13 @@ def main():
     # Регистрация хендлеров
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(MessageHandler(filters.LOCATION & filters.Chat(CHANNEL_ID), handle_location))
-    app.add_handler(MessageHandler(filters.LOCATION & filters.ChatType.PRIVATE, handle_location))
+    
+    # ✅ ВАЖНО: Принимаем геолокации и из канала, и из личных сообщений
+    app.add_handler(MessageHandler(filters.LOCATION, handle_location))
     
     print("🤖 Бот запущен и готов к работе!")
     print(f"📊 Flask сервер на порту {os.environ.get('PORT', 10000)}")
+    print(f"🎯 Listening for locations in channel {CHANNEL_ID} and private chats\n")
     
     # Запуск polling
     app.run_polling(drop_pending_updates=True)
