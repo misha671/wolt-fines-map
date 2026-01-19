@@ -28,7 +28,7 @@
             padding: 0;
             box-sizing: border-box;
         }
- /* H*/
+
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             -webkit-font-smoothing: antialiased;
@@ -49,41 +49,6 @@
             top: 16px;
             left: 16px;
             z-index: 1000;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: var(--wolt-white);
-            padding: 10px 14px;
-            border-radius: var(--radius-md);
-            box-shadow: var(--shadow-md);
-        }
-
-        .logo-icon {
-            width: 24px;
-            height: 24px;
-            background: var(--wolt-blue);
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .logo-icon svg {
-            width: 14px;
-            height: 14px;
-            fill: white;
-        }
-
-        .logo-text {
-            font-weight: 700;
-            font-size: 14px;
-            color: var(--wolt-dark);
         }
 
         /* Stats Badge */
@@ -425,12 +390,6 @@
 
     <!-- Header -->
     <div class="header">
-        <div class="logo">
-            <div class="logo-icon">
-                <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-            </div>
-            <span class="logo-text">Fines Map</span>
-        </div>
         <div class="stats-badge">
             <div class="stats-dot"></div>
             <div class="stats-text"><span id="totalCount">0</span> alerts</div>
