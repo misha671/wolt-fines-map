@@ -16,11 +16,10 @@ from telegram.ext import (
     PicklePersistence
 )
 
-# --- КОНФИГУРАЦИЯ (Берем из настроек Render) ---
+# --- КОНФИГУРАЦИЯ ---
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
-# Константы проекта
 CHANNEL_USERNAME = "@woltwarn"
 CHANNEL_ID = -1003410531789
 TARGET_THREAD_ID = 2
@@ -31,7 +30,7 @@ GITHUB_REPO = "wolt-fines-map"
 GITHUB_FILE = "locations.json"
 SUPER_ADMIN_ID = 913627492
 
-# --- FLASK SERVER (Для UptimeRobot) ---
+# --- FLASK SERVER ---
 server = Flask(__name__)
 
 @server.route('/')
@@ -66,7 +65,7 @@ REGIONS = {
     'ashkelon': {'name': 'Ашкелон', 'coords': (31.6688, 34.5742), 'radius': 6}
 }
 
-# --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
+# --- ФУНКЦИИ ---
 def calculate_distance(lat1, lon1, lat2, lon2):
     from math import radians, sin, cos, sqrt, atan2
     R = 6371
@@ -79,62 +78,75 @@ def get_location_region(latitude, longitude):
     for r_id, r_data in REGIONS.items():
         dist = calculate_distance(latitude, longitude, *r_data['coords'])
         if dist <= r_data['radius']:
-            print(f"📍 Location matched region: {r_data['name']} (distance: {dist:.2f}km)")
+            print(f"📍 Region: {r_data['name']} (dist: {dist:.2f}km)")
             return r_id
-    print(f"⚠️ Location not in any region: {latitude}, {longitude}")
+    print(f"⚠️ No region match for: {latitude}, {longitude}")
     return None
 
 def upload_to_github(data):
-    """Загрузка данных в GitHub с правильной обработкой ошибок"""
+    """Загрузка в GitHub"""
     try:
-        print(f"🔄 Starting GitHub upload... Locations count: {len(data.get('locations', []))}")
+        print(f"\n{'='*60}")
+        print(f"🔄 GITHUB UPLOAD START")
+        print(f"{'='*60}")
+        print(f"Locations to upload: {len(data.get('locations', []))}")
         
         url = f"https://api.github.com/repos/{GITHUB_USERNAME}/{GITHUB_REPO}/contents/{GITHUB_FILE}"
         headers = {
-            "Authorization": f"token {GITHUB_TOKEN}", 
+            "Authorization": f"token {GITHUB_TOKEN}",
             "Accept": "application/vnd.github.v3+json"
         }
         
-        # Получаем текущий SHA файла
-        print(f"🔍 Getting current file SHA...")
-        res = requests.get(url, headers=headers)
-        sha = res.json().get("sha") if res.status_code == 200 else None
-        print(f"📄 Current SHA: {sha[:10] if sha else 'None'}")
+        # Получаем SHA
+        print(f"📡 GET {url}")
+        res = requests.get(url, headers=headers, timeout=10)
+        print(f"Response: {res.status_code}")
         
-        # Подготовка контента
+        if res.status_code == 200:
+            sha = res.json().get("sha")
+            print(f"✅ File exists, SHA: {sha[:10]}...")
+        elif res.status_code == 404:
+            sha = None
+            print(f"⚠️ File not found, will create new")
+        else:
+            print(f"❌ Unexpected response: {res.text[:200]}")
+            return
+        
+        # Подготовка
         content = json.dumps(data, ensure_ascii=False, indent=2)
         payload = {
-            "message": f"Update locations: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            "message": f"Update: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             "content": b64encode(content.encode()).decode(),
         }
-        if sha: 
+        if sha:
             payload["sha"] = sha
         
-        # Отправка на GitHub
-        print(f"📤 Uploading to GitHub...")
-        response = requests.put(url, headers=headers, json=payload)
+        # Отправка
+        print(f"📤 PUT to GitHub...")
+        res = requests.put(url, headers=headers, json=payload, timeout=10)
+        print(f"Response: {res.status_code}")
         
-        if response.status_code in [200, 201]:
-            print(f"✅ GitHub updated successfully: {len(data.get('locations', []))} locations")
-            print(f"🔗 File URL: https://github.com/{GITHUB_USERNAME}/{GITHUB_REPO}/blob/main/{GITHUB_FILE}")
+        if res.status_code in [200, 201]:
+            print(f"✅ SUCCESS! GitHub updated")
+            print(f"🔗 https://github.com/{GITHUB_USERNAME}/{GITHUB_REPO}/blob/main/{GITHUB_FILE}")
         else:
-            print(f"❌ GitHub Error: {response.status_code}")
-            print(f"❌ Response: {response.text[:200]}")
-            
-    except Exception as e: 
-        print(f"❌ GitHub Upload Exception: {e}")
+            print(f"❌ FAILED: {res.text[:200]}")
+        
+        print(f"{'='*60}\n")
+        
+    except Exception as e:
+        print(f"❌ Exception: {e}")
         import traceback
         traceback.print_exc()
 
 async def save_data(context):
-    """Сохранение данных в GitHub"""
+    """Сохранение"""
     locations = context.bot_data.get('locations', [])
     data = {
-        'locations': locations, 
+        'locations': locations,
         'updated_at': datetime.now().isoformat(),
         'total_count': len(locations)
     }
-    print(f"💾 Saving data to GitHub: {len(locations)} locations")
     upload_to_github(data)
 
 # --- ХЕНДЛЕРЫ ---
@@ -142,38 +154,35 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
     if user_id not in context.bot_data.get('users', {}):
-        # Новый пользователь - регистрация
         context.bot_data.setdefault('temp_regions', {})[user_id] = set()
         await update.message.reply_text(
-            "👋 Привет! Выбери регионы для уведомлений:", 
+            "👋 Привет! Выбери регионы для уведомлений:",
             reply_markup=InlineKeyboardMarkup(build_keyboard(set(), "reg"))
         )
-    else: 
+    else:
         await show_menu(update, context)
 
 def build_keyboard(selected, prefix):
-    """Построение клавиатуры для выбора регионов"""
     kb, row = [], []
     for r_id, r_data in REGIONS.items():
         mark = "✅ " if r_id in selected else ""
         row.append(InlineKeyboardButton(
-            f"{mark}{r_data['name']}", 
+            f"{mark}{r_data['name']}",
             callback_data=f"{prefix}_{r_id}"
         ))
-        if len(row) == 2: 
+        if len(row) == 2:
             kb.append(row)
             row = []
-    if row: 
+    if row:
         kb.append(row)
     
-    if prefix == "reg": 
+    if prefix == "reg":
         kb.append([InlineKeyboardButton("✅ Готово", callback_data="reg_done")])
-    else: 
+    else:
         kb.append([InlineKeyboardButton("✅ Сохранить", callback_data="set_done")])
     return kb
 
 async def show_menu(update, context):
-    """Главное меню"""
     uid = update.effective_user.id
     kb = [
         [InlineKeyboardButton("🗺 Открыть карту", web_app=WebAppInfo(url=WEBAPP_URL))],
@@ -187,91 +196,100 @@ async def show_menu(update, context):
     await msg.reply_text("Главное меню:", reply_markup=InlineKeyboardMarkup(kb))
 
 async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка геолокации из канала или личных сообщений"""
-    print("\n" + "="*50)
-    print("📍 LOCATION HANDLER TRIGGERED")
-    print("="*50)
+    """Обработчик геолокации"""
+    print(f"\n{'='*60}")
+    print(f"📍 LOCATION RECEIVED")
+    print(f"{'='*60}")
     
+    # Определяем источник
     post = update.channel_post or update.message
     
     if not post:
-        print("❌ No post found")
+        print("❌ No post")
         return
-        
+    
     if not post.location:
-        print("❌ No location in post")
+        print("❌ No location")
         return
     
-    print(f"✅ Post found: chat_id={post.chat.id}, message_id={post.message_id}")
-    print(f"✅ Location: lat={post.location.latitude}, lon={post.location.longitude}")
+    # Логируем детали
+    print(f"Chat ID: {post.chat.id}")
+    print(f"Chat Type: {post.chat.type}")
+    print(f"Message ID: {post.message_id}")
+    print(f"From User: {post.from_user.first_name if post.from_user else 'None'}")
+    print(f"Location: {post.location.latitude}, {post.location.longitude}")
     
-    # Проверяем, что геометка из нужного канала ИЛИ личного чата
-    if post.chat.id != CHANNEL_ID and post.chat.type != 'private':
-        print(f"⚠️ Wrong chat: {post.chat.id} (expected {CHANNEL_ID} or private)")
+    # Проверка на тред
+    if hasattr(post, 'message_thread_id') and post.message_thread_id:
+        print(f"Thread ID: {post.message_thread_id}")
+    
+    # Проверка чата - принимаем И канал, И личные сообщения
+    is_valid_chat = (
+        post.chat.id == CHANNEL_ID or 
+        post.chat.type == 'private'
+    )
+    
+    if not is_valid_chat:
+        print(f"⚠️ Wrong chat: {post.chat.id} (need {CHANNEL_ID} or private)")
         return
     
-    print(f"✅ Chat verified: {post.chat.id}")
-
-    # Создаем объект локации с правильными полями
+    print(f"✅ Chat OK")
+    
+    # Создаём локацию
     loc = {
-        'latitude': post.location.latitude, 
+        'latitude': post.location.latitude,
         'longitude': post.location.longitude,
         'timestamp': datetime.now().isoformat(),
         'user': post.from_user.first_name if post.from_user else "Admin",
         'message_id': post.message_id
     }
     
-    print(f"📝 Location object created:")
+    print(f"\n📝 Location object:")
     print(json.dumps(loc, indent=2, ensure_ascii=False))
     
-    # Сохраняем в bot_data
+    # Сохраняем
     context.bot_data.setdefault('locations', []).append(loc)
-    
-    # Оставляем только последние 200 меток
     context.bot_data['locations'] = context.bot_data['locations'][-200:]
     
-    print(f"💾 Total locations in memory: {len(context.bot_data['locations'])}")
+    print(f"\n💾 Total in memory: {len(context.bot_data['locations'])}")
     
-    # Сохраняем в GitHub
-    print("🔄 Calling save_data...")
+    # GitHub
+    print(f"\n🔄 Saving to GitHub...")
     await save_data(context)
     
-    # Уведомляем пользователей
-    print("📢 Calling notify_users...")
+    # Уведомления
+    print(f"\n📢 Notifying users...")
     await notify_users(context, loc)
     
-    print("✅ Location handler completed successfully")
-    print("="*50 + "\n")
+    print(f"{'='*60}\n")
 
 async def notify_users(context, loc_data):
-    """Отправка уведомлений пользователям - СТАРОЕ ОФОРМЛЕНИЕ"""
-    print(f"\n📢 NOTIFY_USERS called")
-    print(f"Location: {loc_data['latitude']}, {loc_data['longitude']}")
+    """Уведомления"""
+    print(f"📢 NOTIFY START")
     
     rid = get_location_region(loc_data['latitude'], loc_data['longitude'])
     
     if not rid:
-        print("⚠️ Location not in any region - no notifications sent")
+        print("⚠️ No region - skipping notifications")
         return
     
     r_name = REGIONS[rid]['name']
     time_str = datetime.fromisoformat(loc_data['timestamp']).strftime('%H:%M')
     
     users = context.bot_data.get('users', {})
-    print(f"👥 Total users: {len(users)}")
+    print(f"👥 Users: {len(users)}")
     
-    notified_count = 0
+    sent = 0
     for uid, udata in users.items():
-        print(f"\n👤 Checking user {uid}:")
-        print(f"  - Notifications enabled: {udata.get('notifications')}")
-        print(f"  - User regions: {udata.get('regions', [])}")
-        print(f"  - Location region: {rid}")
+        notifications_on = udata.get('notifications', False)
+        has_region = rid in udata.get('regions', [])
         
-        if udata.get('notifications') and rid in udata.get('regions', []):
+        print(f"\nUser {uid}:")
+        print(f"  Notifications: {notifications_on}")
+        print(f"  Has region: {has_region}")
+        
+        if notifications_on and has_region:
             try:
-                print(f"  ✅ Sending notification to {uid}...")
-                
-                # Текст с эмодзи
                 msg = (
                     f"🚨 <b>Новая метка!</b>\n\n"
                     f"📍 Район: <b>{r_name}</b>\n"
@@ -282,39 +300,35 @@ async def notify_users(context, loc_data):
                 
                 kb = [[InlineKeyboardButton("🗺 Открыть карту", web_app=WebAppInfo(url=WEBAPP_URL))]]
                 
-                # Отправляем текст
                 await context.bot.send_message(
-                    chat_id=uid, 
-                    text=msg, 
+                    chat_id=uid,
+                    text=msg,
                     parse_mode='HTML',
                     reply_markup=InlineKeyboardMarkup(kb)
                 )
                 
-                # Потом геолокацию
                 await context.bot.send_location(
-                    chat_id=uid, 
-                    latitude=loc_data['latitude'], 
+                    chat_id=uid,
+                    latitude=loc_data['latitude'],
                     longitude=loc_data['longitude']
                 )
                 
-                notified_count += 1
-                print(f"  ✅ Notification sent to {uid}")
+                sent += 1
+                print(f"  ✅ Sent")
                 
             except Exception as e:
-                print(f"  ❌ Failed to notify user {uid}: {e}")
+                print(f"  ❌ Error: {e}")
         else:
-            print(f"  ⏭ Skipping user {uid} (notifications off or wrong region)")
+            print(f"  ⏭ Skip")
     
-    print(f"\n📊 Notifications sent: {notified_count} out of {len(users)} users")
+    print(f"\n📊 Sent to {sent}/{len(users)} users")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка нажатий на кнопки"""
     query = update.callback_query
     await query.answer()
     uid, data = query.from_user.id, query.data
 
     if data.startswith("reg_") and data != "reg_done":
-        # Выбор региона при регистрации
         rid = data[4:]
         temp = context.bot_data['temp_regions'][uid]
         temp.remove(rid) if rid in temp else temp.add(rid)
@@ -323,48 +337,42 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     
     elif data == "reg_done":
-        # Завершение регистрации
         sel = list(context.bot_data['temp_regions'].pop(uid, []))
         context.bot_data.setdefault('users', {})[uid] = {
-            'regions': sel, 
+            'regions': sel,
             'notifications': True
         }
-        print(f"✅ User {uid} registered with regions: {sel}")
+        print(f"✅ User {uid} registered: {sel}")
         await query.edit_message_text("✅ Настройка завершена! Жми /start")
 
     elif data == "settings":
-        # Меню настроек
         udata = context.bot_data['users'].get(uid, {})
         notif = "✅ Включены" if udata.get('notifications') else "❌ Выключены"
         txt = (
             f"⚙️ <b>Настройки</b>\n\n"
             f"🔔 Уведомления: {notif}\n"
-            f"📍 Регионов выбрано: {len(udata.get('regions', []))}"
+            f"📍 Регионов: {len(udata.get('regions', []))}"
         )
         kb = [
             [InlineKeyboardButton("📍 Изменить регионы", callback_data="set_regs")],
-            [InlineKeyboardButton("🔔 Вкл/Выкл уведомления", callback_data="notif_toggle")],
+            [InlineKeyboardButton("🔔 Вкл/Выкл", callback_data="notif_toggle")],
             [InlineKeyboardButton("« Назад", callback_data="main")]
         ]
         await query.edit_message_text(txt, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(kb))
 
     elif data == "notif_toggle":
-        # Переключение уведомлений
         context.bot_data['users'][uid]['notifications'] = not context.bot_data['users'][uid].get('notifications')
-        # Обновляем меню настроек
         await button_handler(update, context)
 
     elif data == "set_regs":
-        # Изменение регионов
-        current_regions = set(context.bot_data['users'][uid].get('regions', []))
-        context.bot_data.setdefault('temp_regions', {})[uid] = current_regions
+        current = set(context.bot_data['users'][uid].get('regions', []))
+        context.bot_data.setdefault('temp_regions', {})[uid] = current
         await query.edit_message_text(
             "Выбери регионы:",
-            reply_markup=InlineKeyboardMarkup(build_keyboard(current_regions, "setreg"))
+            reply_markup=InlineKeyboardMarkup(build_keyboard(current, "setreg"))
         )
     
     elif data.startswith("setreg_"):
-        # Изменение выбора региона
         rid = data[7:]
         temp = context.bot_data['temp_regions'][uid]
         temp.remove(rid) if rid in temp else temp.add(rid)
@@ -373,47 +381,38 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     
     elif data == "set_done":
-        # Сохранение измененных регионов
         sel = list(context.bot_data['temp_regions'].pop(uid, []))
         context.bot_data['users'][uid]['regions'] = sel
         await query.edit_message_text("✅ Регионы обновлены!")
         await show_menu(update, context)
 
-    elif data == "main": 
+    elif data == "main":
         await show_menu(update, context)
 
 # --- ЗАПУСК ---
 def main():
-    print("\n" + "="*50)
-    print("🚀 STARTING BOT")
-    print("="*50)
-    print(f"Bot Token: {'✅ Set' if BOT_TOKEN else '❌ Missing'}")
-    print(f"GitHub Token: {'✅ Set' if GITHUB_TOKEN else '❌ Missing'}")
-    print(f"Channel ID: {CHANNEL_ID}")
-    print(f"Super Admin ID: {SUPER_ADMIN_ID}")
-    print("="*50 + "\n")
+    print(f"\n{'='*60}")
+    print(f"🚀 BOT STARTING")
+    print(f"{'='*60}")
+    print(f"Bot Token: {'SET' if BOT_TOKEN else 'MISSING'}")
+    print(f"GitHub Token: {'SET' if GITHUB_TOKEN else 'MISSING'}")
+    print(f"Channel: {CHANNEL_ID}")
+    print(f"Admin: {SUPER_ADMIN_ID}")
+    print(f"{'='*60}\n")
     
-    # Запускаем Flask в отдельном потоке
     threading.Thread(target=run_flask, daemon=True).start()
     
-    # Настройка персистентности
     persistence = PicklePersistence(filepath="bot_data.pickle")
-    
-    # Создание приложения
     app = ApplicationBuilder().token(BOT_TOKEN).persistence(persistence).build()
     
-    # Регистрация хендлеров
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
-    
-    # ✅ ВАЖНО: Принимаем геолокации и из канала, и из личных сообщений
     app.add_handler(MessageHandler(filters.LOCATION, handle_location))
     
-    print("🤖 Бот запущен и готов к работе!")
-    print(f"📊 Flask сервер на порту {os.environ.get('PORT', 10000)}")
-    print(f"🎯 Listening for locations in channel {CHANNEL_ID} and private chats\n")
+    print("🤖 Bot started!")
+    print(f"📊 Flask on port {os.environ.get('PORT', 10000)}")
+    print(f"🎯 Listening for locations\n")
     
-    # Запуск polling
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
