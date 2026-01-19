@@ -51,39 +51,44 @@
             z-index: 1000;
         }
 
-        /* Stats Badge */
-        .stats-badge {
+        /* Badges */
+        .badge {
             background: var(--wolt-white);
             padding: 10px 14px;
-            border-radius: var(--radius-md);
+            border-radius: 20px;
             box-shadow: var(--shadow-md);
             display: flex;
             align-items: center;
             gap: 8px;
-        }
-
-        .stats-dot {
-            width: 8px;
-            height: 8px;
-            background: var(--wolt-red);
-            border-radius: 50%;
-            animation: blink 2s ease-in-out infinite;
-        }
-
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
-        }
-
-        .stats-text {
             font-size: 13px;
             font-weight: 600;
             color: var(--wolt-dark);
         }
 
-        .stats-text span {
-            color: var(--wolt-gray-600);
-            font-weight: 500;
+        .badge-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .badge-dot.red {
+            background: var(--wolt-red);
+            animation: blink 2s ease-in-out infinite;
+        }
+
+        .badge-dot.green {
+            background: #00B37A;
+            box-shadow: 0 0 6px rgba(0, 179, 122, 0.5);
+        }
+
+        .badge-dot.orange {
+            background: var(--wolt-orange);
+            animation: blink 1s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
         }
 
         /* Server Status */
@@ -92,37 +97,6 @@
             top: 16px;
             right: 16px;
             z-index: 1000;
-            background: var(--wolt-white);
-            padding: 8px 12px;
-            border-radius: 20px;
-            box-shadow: var(--shadow-md);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--wolt-dark);
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-        }
-
-        .status-dot.online {
-            background: #00B37A;
-            box-shadow: 0 0 6px rgba(0, 179, 122, 0.5);
-        }
-
-        .status-dot.offline {
-            background: var(--wolt-red);
-            box-shadow: 0 0 6px rgba(227, 64, 64, 0.5);
-        }
-
-        .status-dot.checking {
-            background: var(--wolt-orange);
-            animation: blink 1s ease-in-out infinite;
         }
 
         /* Controls */
@@ -390,16 +364,18 @@
 
     <!-- Header -->
     <div class="header">
-        <div class="stats-badge">
-            <div class="stats-dot"></div>
-            <div class="stats-text"><span id="totalCount">0</span> alerts</div>
+        <div class="badge">
+            <div class="badge-dot red"></div>
+            <span><span id="totalCount">0</span> alerts</span>
         </div>
     </div>
 
     <!-- Server Status -->
-    <div class="server-status" id="serverStatus">
-        <div class="status-dot online"></div>
-        <span>Online</span>
+    <div class="server-status">
+        <div class="badge" id="serverStatus">
+            <div class="badge-dot green" id="statusDot"></div>
+            <span id="statusText">Online</span>
+        </div>
     </div>
 
     <!-- Controls -->
@@ -483,17 +459,19 @@
         }
 
         function updateServerStatus(status) {
-            const statusEl = document.getElementById('serverStatus');
-            const dot = statusEl.querySelector('.status-dot');
-            const text = statusEl.querySelector('span');
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
             
-            dot.className = 'status-dot ' + status;
+            dot.className = 'badge-dot';
             
             if (status === 'online') {
+                dot.classList.add('green');
                 text.textContent = 'Online';
             } else if (status === 'offline') {
+                dot.classList.add('red');
                 text.textContent = 'Offline';
             } else {
+                dot.classList.add('orange');
                 text.textContent = 'Checking...';
             }
         }
