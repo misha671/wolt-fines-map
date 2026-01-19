@@ -20,9 +20,9 @@ from telegram.ext import (
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
-CHANNEL_USERNAME = "@woltwarn"
-CHANNEL_ID = -1003410531789
-TARGET_THREAD_ID = 2
+CHANNEL_USERNAME = "@WoltIsrael2023"
+CHANNEL_ID = -1001234567890  # ⚠️ НУЖНО УЗНАТЬ ПРАВИЛЬНЫЙ ID
+TARGET_THREAD_ID = 53764
 WEBAPP_URL = "https://misha671.github.io/wolt-fines-map/"
 
 GITHUB_USERNAME = "misha671"
@@ -320,6 +320,8 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     print(f"Chat ID: {post.chat.id}")
+    print(f"Chat Username: {post.chat.username if hasattr(post.chat, 'username') else 'None'}")
+    print(f"Chat Title: {post.chat.title if hasattr(post.chat, 'title') else 'None'}")
     print(f"Chat Type: {post.chat.type}")
     print(f"Message ID: {post.message_id}")
     print(f"From User: {post.from_user.first_name if post.from_user else 'None'}")
@@ -328,7 +330,8 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if hasattr(post, 'message_thread_id') and post.message_thread_id:
         print(f"Thread ID: {post.message_thread_id}")
     
-    # ✅ ПРИНИМАЕМ ГЕОМЕТКИ ИЗ ЛЮБОГО КАНАЛА И ЛИЧНЫХ СООБЩЕНИЙ
+    # 🔍 ВРЕМЕННО: Принимаем из любого канала чтобы узнать ID
+    # После того как узнаем ID, включим проверку обратно
     is_valid_chat = (
         post.chat.type in ['supergroup', 'group', 'private', 'channel']
     )
