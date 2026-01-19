@@ -215,13 +215,14 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if hasattr(post, 'message_thread_id') and post.message_thread_id:
         print(f"Thread ID: {post.message_thread_id}")
     
+    # ✅ ПРИНИМАЕМ ГЕОМЕТКИ ИЗ ЛЮБОГО КАНАЛА И ЛИЧНЫХ СООБЩЕНИЙ
+    # Убираем проверку на конкретный ID канала
     is_valid_chat = (
-        post.chat.id == CHANNEL_ID or
-        post.chat.type == 'private'
+        post.chat.type in ['supergroup', 'group', 'private', 'channel']
     )
     
     if not is_valid_chat:
-        print(f"⚠️ Wrong chat: {post.chat.id} (need {CHANNEL_ID} or private)")
+        print(f"⚠️ Wrong chat type: {post.chat.type}")
         return
     
     print(f"✅ Chat OK")
