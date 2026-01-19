@@ -1,339 +1,900 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Карта штрафов Wolt</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <title>Wolt Fines Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --wolt-blue: #009DE0;
+            --wolt-blue-dark: #0084BD;
+            --wolt-blue-light: #E6F6FC;
+            --wolt-dark: #202125;
+            --wolt-gray-900: #1F2024;
+            --wolt-gray-800: #2C2E33;
+            --wolt-gray-700: #3E4047;
+            --wolt-gray-600: #5C5E66;
+            --wolt-gray-400: #9B9DA3;
+            --wolt-gray-200: #E8E9EB;
+            --wolt-gray-100: #F4F4F5;
+            --wolt-white: #FFFFFF;
+            --wolt-red: #E34040;
+            --wolt-orange: #FF9F38;
+            --wolt-green: #00B37A;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 24px;
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #1a1a1a;
-            color: #ffffff;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--wolt-gray-100);
+            color: var(--wolt-dark);
             overflow: hidden;
+            -webkit-font-smoothing: antialiased;
         }
-        
+
         #map {
-            width: 100vw;
-            height: 100vh;
-        }
-        
-        .info-panel {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(26, 26, 26, 0.95);
-            backdrop-filter: blur(10px);
-            padding: 15px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            z-index: 1000;
-            border: 1px solid rgba(255, 107, 53, 0.3);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
         }
-        
-        .info-panel h3 {
-            margin: 0 0 10px 0;
-            font-size: 15px;
-            color: #FF6B35;
-            font-weight: 600;
-        }
-        
-        .info-panel p {
-            margin: 5px 0;
-            font-size: 13px;
-            color: #999;
-        }
-        
-        .info-panel strong {
-            color: #FF6B35;
-            font-size: 20px;
-        }
-        
-        .refresh-btn {
+
+        /* Top Header */
+        .header {
             position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%);
-            color: white;
-            border: none;
-            padding: 14px 28px;
-            border-radius: 25px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            z-index: 1000;
-            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
-            transition: all 0.2s;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 12px 16px;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 100%);
+            pointer-events: none;
         }
-        
-        .refresh-btn:active {
-            transform: translateX(-50%) scale(0.95);
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            pointer-events: auto;
         }
-        
-        .loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(26, 26, 26, 0.95);
-            padding: 20px 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            z-index: 2000;
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--wolt-white);
+            padding: 10px 16px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+        }
+
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            background: var(--wolt-blue);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-icon svg {
+            width: 18px;
+            height: 18px;
+            fill: white;
+        }
+
+        .logo-text {
+            font-weight: 700;
             font-size: 16px;
-            color: #FF6B35;
-            border: 1px solid rgba(255, 107, 53, 0.3);
+            color: var(--wolt-dark);
         }
-        
-        .hidden {
+
+        .logo-badge {
+            background: var(--wolt-blue-light);
+            color: var(--wolt-blue);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 6px;
+            margin-left: 4px;
+        }
+
+        /* Stats Panel */
+        .stats-panel {
+            position: absolute;
+            bottom: 100px;
+            left: 16px;
+            right: 16px;
+            z-index: 100;
+            background: var(--wolt-white);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-lg);
+            padding: 20px;
+            max-width: 400px;
+        }
+
+        @media (min-width: 768px) {
+            .stats-panel {
+                left: 16px;
+                right: auto;
+                bottom: 24px;
+                width: 320px;
+            }
+        }
+
+        .stats-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .stats-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stats-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--wolt-red);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stats-icon svg {
+            width: 22px;
+            height: 22px;
+            fill: white;
+        }
+
+        .stats-label {
+            font-weight: 600;
+            font-size: 15px;
+            color: var(--wolt-dark);
+        }
+
+        .stats-sublabel {
+            font-size: 13px;
+            color: var(--wolt-gray-600);
+            margin-top: 2px;
+        }
+
+        .stats-time {
+            font-size: 13px;
+            color: var(--wolt-gray-400);
+            font-weight: 500;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .stat-item {
+            background: var(--wolt-gray-100);
+            border-radius: var(--radius-md);
+            padding: 14px 12px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--wolt-dark);
+            line-height: 1;
+        }
+
+        .stat-value.highlight {
+            color: var(--wolt-blue);
+        }
+
+        .stat-desc {
+            font-size: 11px;
+            color: var(--wolt-gray-600);
+            margin-top: 6px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        /* Action Buttons */
+        .actions {
+            position: absolute;
+            bottom: 24px;
+            left: 16px;
+            right: 16px;
+            z-index: 100;
+            display: flex;
+            gap: 12px;
+            max-width: 400px;
+        }
+
+        @media (min-width: 768px) {
+            .actions {
+                left: 16px;
+                right: auto;
+                width: 320px;
+            }
+        }
+
+        .btn {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 20px;
+            border-radius: var(--radius-lg);
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: var(--wolt-blue);
+            color: white;
+            box-shadow: var(--shadow-md), 0 4px 12px rgba(0,157,224,0.3);
+        }
+
+        .btn-primary:hover {
+            background: var(--wolt-blue-dark);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: var(--wolt-white);
+            color: var(--wolt-dark);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-secondary:hover {
+            background: var(--wolt-gray-100);
+        }
+
+        .btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Map Controls */
+        .map-controls {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .map-btn {
+            width: 44px;
+            height: 44px;
+            background: var(--wolt-white);
+            border: none;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .map-btn:hover {
+            background: var(--wolt-gray-100);
+        }
+
+        .map-btn:active {
+            transform: scale(0.95);
+        }
+
+        .map-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: var(--wolt-gray-700);
+        }
+
+        .map-btn.active svg {
+            fill: var(--wolt-blue);
+        }
+
+        /* Loading State */
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: var(--wolt-white);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            transition: opacity 0.3s ease;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--wolt-gray-200);
+            border-top-color: var(--wolt-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 15px;
+            color: var(--wolt-gray-600);
+            font-weight: 500;
+        }
+
+        /* Custom Marker */
+        .custom-marker {
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .custom-marker:hover {
+            transform: scale(1.15);
+        }
+
+        .marker-dot {
+            width: 100%;
+            height: 100%;
+            background: var(--wolt-red);
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            box-shadow: 0 4px 12px rgba(227, 64, 64, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid white;
+        }
+
+        .marker-dot::after {
+            content: '';
+            width: 10px;
+            height: 10px;
+            background: white;
+            border-radius: 50%;
+            transform: rotate(45deg);
+        }
+
+        .marker-new .marker-dot {
+            background: var(--wolt-orange);
+            box-shadow: 0 4px 12px rgba(255, 159, 56, 0.5);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 4px 12px rgba(255, 159, 56, 0.5); }
+            50% { box-shadow: 0 4px 24px rgba(255, 159, 56, 0.8); }
+        }
+
+        /* Popup */
+        .maplibregl-popup-content {
+            padding: 16px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            font-family: 'Inter', sans-serif;
+            min-width: 200px;
+        }
+
+        .maplibregl-popup-close-button {
+            font-size: 20px;
+            padding: 8px;
+            color: var(--wolt-gray-400);
+        }
+
+        .popup-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .popup-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--wolt-red);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .popup-icon svg {
+            width: 18px;
+            height: 18px;
+            fill: white;
+        }
+
+        .popup-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--wolt-dark);
+        }
+
+        .popup-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .popup-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--wolt-gray-600);
+        }
+
+        .popup-row svg {
+            width: 16px;
+            height: 16px;
+            fill: var(--wolt-gray-400);
+            flex-shrink: 0;
+        }
+
+        /* Hide default maplibre attribution */
+        .maplibregl-ctrl-bottom-left,
+        .maplibregl-ctrl-bottom-right {
             display: none;
         }
 
-        .leaflet-popup-content-wrapper {
-            background: rgba(26, 26, 26, 0.95);
-            color: white;
-            border: 1px solid rgba(255, 107, 53, 0.3);
-        }
-        
-        .leaflet-popup-tip {
-            background: rgba(26, 26, 26, 0.95);
-        }
-        
-        .marker-popup strong {
-            color: #FF6B35;
-            font-size: 15px;
-            display: block;
-            margin-bottom: 5px;
-        }
-        
-        .marker-popup .time {
-            color: #999;
-            font-size: 12px;
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 20px 0;
         }
 
-        .status-indicator {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(26, 26, 26, 0.95);
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 11px;
-            color: #4CAF50;
-            z-index: 1000;
-            border: 1px solid rgba(76, 175, 80, 0.3);
+        .empty-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--wolt-green);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
         }
-        
-        .status-indicator.loading {
-            color: #FF6B35;
-            border-color: rgba(255, 107, 53, 0.3);
+
+        .empty-icon svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
         }
-        
-        .status-indicator.error {
-            color: #f44336;
-            border-color: rgba(244, 67, 54, 0.3);
+
+        .empty-title {
+            font-weight: 600;
+            font-size: 15px;
+            color: var(--wolt-dark);
+            margin-bottom: 4px;
+        }
+
+        .empty-desc {
+            font-size: 13px;
+            color: var(--wolt-gray-600);
         }
     </style>
 </head>
 <body>
-    <div id="loading" class="loading">⏳ Загрузка...</div>
     <div id="map"></div>
-    
-    <div class="info-panel">
-        <h3>⚠️ Штрафы Wolt</h3>
-        <p>Точек: <strong id="location-count">0</strong></p>
-        <p style="font-size: 11px; margin-top: 8px;">За последние 4 часа</p>
-        <p id="last-update" style="font-size: 11px; color: #666;">--:--</p>
-    </div>
-    
-    <div id="status" class="status-indicator">GitHub</div>
-    
-    <button class="refresh-btn" onclick="loadLocations(true)">🔄 Обновить</button>
 
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading map...</div>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                </div>
+                <span class="logo-text">Fines Map</span>
+                <span class="logo-badge">BETA</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Panel -->
+    <div class="stats-panel" id="statsPanel">
+        <div class="stats-header">
+            <div class="stats-title">
+                <div class="stats-icon">
+                    <svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+                </div>
+                <div>
+                    <div class="stats-label">Fine Alerts</div>
+                    <div class="stats-sublabel">Last 4 hours</div>
+                </div>
+            </div>
+            <div class="stats-time" id="updateTime">--:--</div>
+        </div>
+        <div id="statsContent">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value highlight" id="totalCount">0</div>
+                    <div class="stat-desc">Total</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="recentCount">0</div>
+                    <div class="stat-desc">Recent</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="oldCount">0</div>
+                    <div class="stat-desc">Older</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="actions">
+        <button class="btn btn-secondary" id="refreshBtn">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            Refresh
+        </button>
+        <button class="btn btn-primary" id="locateBtn">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+            My Location
+        </button>
+    </div>
+
+    <!-- Map Controls -->
+    <div class="map-controls">
+        <button class="map-btn" id="zoomIn" title="Zoom in">
+            <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        </button>
+        <button class="map-btn" id="zoomOut" title="Zoom out">
+            <svg viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg>
+        </button>
+        <button class="map-btn" id="centerMap" title="Center map">
+            <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+        </button>
+    </div>
+
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
     <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.ready();
-        tg.disableVerticalSwipes();
-        
-        const map = L.map('map').setView([32.0853, 34.7818], 12);
-        
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap',
-            maxZoom: 19
-        }).addTo(map);
-        
+        // Configuration
+        const DATA_URL = 'https://misha671.github.io/wolt-fines-map/locations.json';
+        const DEFAULT_CENTER = [34.7818, 32.0853]; // Tel Aviv
+        const DEFAULT_ZOOM = 12;
+
+        let map;
         let markers = [];
-        
-        function setStatus(text, type = 'ok') {
-            const status = document.getElementById('status');
-            status.textContent = text;
-            status.className = 'status-indicator' + (type !== 'ok' ? ' ' + type : '');
-        }
-        
-        function formatRelativeTime(isoString) {
-            try {
-                const date = new Date(isoString);
-                const now = new Date();
-                const diffMs = now - date;
-                const diffMins = Math.floor(diffMs / 60000);
-                
-                if (diffMins < 1) return 'только что';
-                if (diffMins < 60) return `${diffMins} мин назад`;
-                
-                const diffHours = Math.floor(diffMins / 60);
-                const remainMins = diffMins % 60;
-                if (diffHours < 4) return `${diffHours}ч ${remainMins}м назад`;
-                
-                return date.toLocaleTimeString('ru-RU', { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                });
-            } catch (e) {
-                return 'неизвестно';
-            }
-        }
-        
-        async function loadLocations(manual = false) {
-            try {
-                if (manual) {
-                    setStatus('⏳ Загрузка...', 'loading');
+        let locationsData = [];
+
+        // Initialize map
+        function initMap() {
+            map = new maplibregl.Map({
+                container: 'map',
+                style: {
+                    version: 8,
+                    sources: {
+                        'osm': {
+                            type: 'raster',
+                            tiles: [
+                                'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                            ],
+                            tileSize: 256,
+                            attribution: '© OpenStreetMap'
+                        }
+                    },
+                    layers: [{
+                        id: 'osm',
+                        type: 'raster',
+                        source: 'osm',
+                        minzoom: 0,
+                        maxzoom: 19
+                    }],
+                    glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf'
+                },
+                center: DEFAULT_CENTER,
+                zoom: DEFAULT_ZOOM,
+                maxZoom: 18,
+                minZoom: 8
+            });
+
+            map.on('load', () => {
+                document.getElementById('loading').classList.add('hidden');
+                loadData();
+            });
+
+            // Map controls
+            document.getElementById('zoomIn').addEventListener('click', () => {
+                map.zoomIn();
+            });
+
+            document.getElementById('zoomOut').addEventListener('click', () => {
+                map.zoomOut();
+            });
+
+            document.getElementById('centerMap').addEventListener('click', () => {
+                if (locationsData.length > 0) {
+                    fitMapToMarkers();
+                } else {
+                    map.flyTo({ center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM });
                 }
-                
-                const cacheBuster = Date.now();
-                const url = `https://misha671.github.io/wolt-fines-map/locations.json?t=${cacheBuster}`;
-                
-                const response = await fetch(url, {
-                    method: 'GET',
-                    cache: 'no-store',
-                    headers: {
-                        'Cache-Control': 'no-cache'
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                
+            });
+
+            document.getElementById('refreshBtn').addEventListener('click', () => {
+                loadData();
+            });
+
+            document.getElementById('locateBtn').addEventListener('click', () => {
+                locateUser();
+            });
+        }
+
+        // Load data from JSON
+        async function loadData() {
+            try {
+                const response = await fetch(DATA_URL + '?t=' + Date.now());
                 const data = await response.json();
-                let locations = data.locations || [];
                 
-                if (locations.length === 0) {
-                    setStatus('📭 Нет данных');
-                    updateUI(0);
-                    document.getElementById('loading').classList.add('hidden');
-                    return;
-                }
-                
-                const now = new Date();
-                const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
-                
-                const recentLocations = locations.filter(loc => {
-                    try {
-                        return new Date(loc.timestamp) > fourHoursAgo;
-                    } catch (e) {
-                        return false;
-                    }
-                });
-                
-                markers.forEach(marker => {
-                    try {
-                        map.removeLayer(marker);
-                    } catch (e) {}
-                });
-                markers = [];
-                
-                if (recentLocations.length > 0) {
-                    recentLocations.forEach((loc) => {
-                        try {
-                            const customIcon = L.divIcon({
-                                className: 'custom-marker-icon',
-                                html: `<div style="background: #FF6B35; width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"><span style="transform: rotate(45deg); font-size: 14px;">⚠️</span></div>`,
-                                iconSize: [30, 30],
-                                iconAnchor: [15, 30],
-                                popupAnchor: [0, -30]
-                            });
-                            
-                            const marker = L.marker([loc.latitude, loc.longitude], {
-                                icon: customIcon
-                            })
-                                .addTo(map)
-                                .bindPopup(`
-                                    <div class="marker-popup">
-                                        <strong>${loc.user || 'Пользователь'}</strong>
-                                        <div class="time">${formatRelativeTime(loc.timestamp)}</div>
-                                    </div>
-                                `);
-                            
-                            markers.push(marker);
-                        } catch (e) {
-                            console.error('Ошибка маркера:', e);
-                        }
-                    });
-                    
-                    try {
-                        if (markers.length > 0) {
-                            const group = L.featureGroup(markers);
-                            map.fitBounds(group.getBounds().pad(0.1));
-                        }
-                    } catch (e) {
-                        console.error('Ошибка центрирования:', e);
-                    }
-                }
-                
-                updateUI(recentLocations.length);
-                setStatus('✅ Загружено');
-                
-                if (manual && tg.HapticFeedback) {
-                    tg.HapticFeedback.impactOccurred('medium');
-                }
+                locationsData = data.locations || [];
+                updateMarkers();
+                updateStats();
                 
             } catch (error) {
-                console.error('Ошибка загрузки:', error);
-                setStatus('❌ Ошибка', 'error');
-                updateUI(0);
+                console.error('Error loading data:', error);
+                showEmptyState();
+            }
+        }
+
+        // Update markers on map
+        function updateMarkers() {
+            // Clear existing markers
+            markers.forEach(marker => marker.remove());
+            markers = [];
+
+            const now = new Date();
+            const fourHoursAgo = new Date(now - 4 * 60 * 60 * 1000);
+            const oneHourAgo = new Date(now - 60 * 60 * 1000);
+
+            locationsData.forEach(location => {
+                const timestamp = new Date(location.timestamp);
                 
-                if (manual) {
-                    tg.showAlert('Ошибка загрузки данных');
-                }
-            } finally {
-                document.getElementById('loading').classList.add('hidden');
-            }
-        }
-        
-        function updateUI(count) {
-            document.getElementById('location-count').textContent = count;
-            const time = new Date().toLocaleTimeString('ru-RU', {
-                hour: '2-digit', 
-                minute: '2-digit'
+                // Only show markers from last 4 hours
+                if (timestamp < fourHoursAgo) return;
+
+                const isNew = timestamp > oneHourAgo;
+                
+                // Create marker element
+                const el = document.createElement('div');
+                el.className = `custom-marker ${isNew ? 'marker-new' : ''}`;
+                el.innerHTML = '<div class="marker-dot"></div>';
+
+                // Create popup
+                const popup = new maplibregl.Popup({ offset: 25 })
+                    .setHTML(createPopupContent(location, isNew));
+
+                // Create marker
+                const marker = new maplibregl.Marker({ element: el })
+                    .setLngLat([location.longitude, location.latitude])
+                    .setPopup(popup)
+                    .addTo(map);
+
+                markers.push(marker);
             });
-            document.getElementById('last-update').textContent = time;
-        }
-        
-        loadLocations(true);
-        
-        setInterval(() => {
-            loadLocations(false);
-        }, 15000);
-        
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) {
-                loadLocations(false);
+
+            if (markers.length > 0) {
+                fitMapToMarkers();
             }
-        });
-        
-        tg.onEvent('viewportChanged', () => {
-            map.invalidateSize();
-        });
+        }
+
+        // Create popup HTML
+        function createPopupContent(location, isNew) {
+            const time = new Date(location.timestamp);
+            const timeStr = time.toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: false 
+            });
+            const dateStr = time.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric'
+            });
+
+            return `
+                <div class="popup-header">
+                    <div class="popup-icon">
+                        <svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+                    </div>
+                    <div class="popup-title">${isNew ? '🔥 New Alert' : 'Fine Alert'}</div>
+                </div>
+                <div class="popup-info">
+                    <div class="popup-row">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z"/></svg>
+                        <span>${timeStr} · ${dateStr}</span>
+                    </div>
+                    <div class="popup-row">
+                        <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                        <span>Reported by ${location.user || 'Anonymous'}</span>
+                    </div>
+                    <div class="popup-row">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                        <span>${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Update statistics
+        function updateStats() {
+            const now = new Date();
+            const fourHoursAgo = new Date(now - 4 * 60 * 60 * 1000);
+            const oneHourAgo = new Date(now - 60 * 60 * 1000);
+
+            const recentLocations = locationsData.filter(loc => {
+                const timestamp = new Date(loc.timestamp);
+                return timestamp > fourHoursAgo;
+            });
+
+            const newCount = recentLocations.filter(loc => {
+                const timestamp = new Date(loc.timestamp);
+                return timestamp > oneHourAgo;
+            }).length;
+
+            const total = recentLocations.length;
+            const older = total - newCount;
+
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('recentCount').textContent = newCount;
+            document.getElementById('oldCount').textContent = older;
+            document.getElementById('updateTime').textContent = now.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
+
+            // Show empty state if no data
+            if (total === 0) {
+                showEmptyState();
+            } else {
+                showStats();
+            }
+        }
+
+        // Show empty state
+        function showEmptyState() {
+            document.getElementById('statsContent').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+                    </div>
+                    <div class="empty-title">All Clear!</div>
+                    <div class="empty-desc">No alerts in the last 4 hours</div>
+                </div>
+            `;
+        }
+
+        // Show stats grid
+        function showStats() {
+            const total = document.getElementById('totalCount')?.textContent || '0';
+            const recent = document.getElementById('recentCount')?.textContent || '0';
+            const older = document.getElementById('oldCount')?.textContent || '0';
+            
+            document.getElementById('statsContent').innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value highlight" id="totalCount">${total}</div>
+                        <div class="stat-desc">Total</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="recentCount">${recent}</div>
+                        <div class="stat-desc">Recent</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="oldCount">${older}</div>
+                        <div class="stat-desc">Older</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Fit map to show all markers
+        function fitMapToMarkers() {
+            if (markers.length === 0) return;
+
+            const bounds = new maplibregl.LngLatBounds();
+            markers.forEach(marker => {
+                bounds.extend(marker.getLngLat());
+            });
+
+            map.fitBounds(bounds, {
+                padding: { top: 100, bottom: 200, left: 50, right: 50 },
+                maxZoom: 14
+            });
+        }
+
+        // Locate user
+        function locateUser() {
+            if (!navigator.geolocation) {
+                alert('Geolocation is not supported by your browser');
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    map.flyTo({
+                        center: [longitude, latitude],
+                        zoom: 15
+                    });
+
+                    // Add user location marker
+                    const el = document.createElement('div');
+                    el.style.cssText = `
+                        width: 20px;
+                        height: 20px;
+                        background: #009DE0;
+                        border: 3px solid white;
+                        border-radius: 50%;
+                        box-shadow: 0 2px 8px rgba(0,157,224,0.5);
+                    `;
+
+                    new maplibregl.Marker({ element: el })
+                        .setLngLat([longitude, latitude])
+                        .addTo(map);
+                },
+                (error) => {
+                    console.error('Geolocation error:', error);
+                    alert('Unable to get your location');
+                }
+            );
+        }
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadData, 30000);
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', initMap);
     </script>
 </body>
 </html>
