@@ -1,13 +1,13 @@
 {
   "locations": [
     {
-      "latitude": 32.045543,
-      "longitude": 34.768389,
-      "timestamp": "2026-01-19T22:05:27.292051",
-      "user": "TEST",
-      "message_id": 999
+      "latitude": 32.051389,
+      "longitude": 34.770263,
+      "timestamp": "2026-01-19T20:33:07.612713",
+      "user": "миша",
+      "message_id": 178
     }
   ],
-  "updated_at": "2026-01-19T22:05:27.292051",
+  "updated_at": "2026-01-19T20:33:07.612790",
   "total_count": 1
 }
