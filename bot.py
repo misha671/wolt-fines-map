@@ -84,7 +84,6 @@ def get_location_region(latitude, longitude):
     return None
 
 def upload_to_github(data):
-    """Загрузка в GitHub"""
     try:
         print(f"\n{'='*60}")
         print(f"🔄 GITHUB UPLOAD START")
@@ -97,7 +96,6 @@ def upload_to_github(data):
             "Accept": "application/vnd.github.v3+json"
         }
         
-        # Получаем SHA
         print(f"📡 GET {url}")
         res = requests.get(url, headers=headers, timeout=10)
         print(f"Response: {res.status_code}")
@@ -112,7 +110,6 @@ def upload_to_github(data):
             print(f"❌ Unexpected response: {res.text[:200]}")
             return
         
-        # Подготовка
         content = json.dumps(data, ensure_ascii=False, indent=2)
         payload = {
             "message": f"Update: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
@@ -121,7 +118,6 @@ def upload_to_github(data):
         if sha:
             payload["sha"] = sha
         
-        # Отправка
         print(f"📤 PUT to GitHub...")
         res = requests.put(url, headers=headers, json=payload, timeout=10)
         print(f"Response: {res.status_code}")
@@ -140,13 +136,13 @@ def upload_to_github(data):
         traceback.print_exc()
 
 async def save_data(context):
-    """Сохранение"""
     locations = context.bot_data.get('locations', [])
     data = {
         'locations': locations,
         'updated_at': datetime.now().isoformat(),
         'total_count': len(locations)
     }
+    print(f"💾 Saving data to GitHub: {len(locations)} locations")
     upload_to_github(data)
 
 # --- ХЕНДЛЕРЫ ---
@@ -196,12 +192,10 @@ async def show_menu(update, context):
     await msg.reply_text("Главное меню:", reply_markup=InlineKeyboardMarkup(kb))
 
 async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик геолокации"""
     print(f"\n{'='*60}")
     print(f"📍 LOCATION RECEIVED")
     print(f"{'='*60}")
     
-    # Определяем источник
     post = update.channel_post or update.message
     
     if not post:
@@ -212,20 +206,17 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print("❌ No location")
         return
     
-    # Логируем детали
     print(f"Chat ID: {post.chat.id}")
     print(f"Chat Type: {post.chat.type}")
     print(f"Message ID: {post.message_id}")
     print(f"From User: {post.from_user.first_name if post.from_user else 'None'}")
     print(f"Location: {post.location.latitude}, {post.location.longitude}")
     
-    # Проверка на тред
     if hasattr(post, 'message_thread_id') and post.message_thread_id:
         print(f"Thread ID: {post.message_thread_id}")
     
-    # Проверка чата - принимаем И канал, И личные сообщения
     is_valid_chat = (
-        post.chat.id == CHANNEL_ID or 
+        post.chat.id == CHANNEL_ID or
         post.chat.type == 'private'
     )
     
@@ -235,7 +226,6 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     print(f"✅ Chat OK")
     
-    # Создаём локацию
     loc = {
         'latitude': post.location.latitude,
         'longitude': post.location.longitude,
@@ -247,24 +237,20 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"\n📝 Location object:")
     print(json.dumps(loc, indent=2, ensure_ascii=False))
     
-    # Сохраняем
     context.bot_data.setdefault('locations', []).append(loc)
     context.bot_data['locations'] = context.bot_data['locations'][-200:]
     
     print(f"\n💾 Total in memory: {len(context.bot_data['locations'])}")
     
-    # GitHub
     print(f"\n🔄 Saving to GitHub...")
     await save_data(context)
     
-    # Уведомления
     print(f"\n📢 Notifying users...")
     await notify_users(context, loc)
     
     print(f"{'='*60}\n")
 
 async def notify_users(context, loc_data):
-    """Уведомления"""
     print(f"📢 NOTIFY START")
     
     rid = get_location_region(loc_data['latitude'], loc_data['longitude'])
@@ -400,7 +386,7 @@ def main():
     print(f"Admin: {SUPER_ADMIN_ID}")
     print(f"{'='*60}\n")
     
-    # ✅ УДАЛЯЕМ WEBHOOK ПЕРЕД ЗАПУСКОМ
+    # ✅ УДАЛЯЕМ WEBHOOK
     print("🗑️ Deleting webhook...")
     try:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook"
@@ -412,11 +398,16 @@ def main():
     except Exception as e:
         print(f"⚠️ Error deleting webhook: {e}")
     
+    # Запускаем Flask в отдельном потоке
     threading.Thread(target=run_flask, daemon=True).start()
     
+    # Настройка персистентности
     persistence = PicklePersistence(filepath="bot_data.pickle")
+    
+    # Создание приложения
     app = ApplicationBuilder().token(BOT_TOKEN).persistence(persistence).build()
     
+    # Регистрация хендлеров
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.LOCATION, handle_location))
@@ -425,6 +416,7 @@ def main():
     print(f"📊 Flask on port {os.environ.get('PORT', 10000)}")
     print(f"🎯 Listening for locations\n")
     
+    # ✅ ЗАПУСК POLLING (НЕ WEBHOOK!)
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
